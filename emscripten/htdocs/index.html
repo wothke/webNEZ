@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<!--
+ WebNEZ: HTML5 Audio/JavaScript port of nezplay/NEZplug(++).
+
+ Copyright 
+  (C) 2018 Juergen Wothke
+
+ Credits: 
+  * Based on original nezplay(https://github.com/BouKiCHi/nezplay) /
+    NEZplug++(http://offgao.net/program/nezplug++.html) code by Mamiya.
+  * The visualization used on this page was strongly "inspired" by this demo:
+    http://html5-demos.appspot.com/static/webaudio/createMediaSourceElement.html
+
+ LICENSE
+ 
+ This library is free software; you can redistribute it and/or modify it
+ under the terms of the GNU General Public License as published by
+ the Free Software Foundation; either version 2.1 of the License, or (at
+ your option) any later version. This library is distributed in the hope
+ that it will be useful, but WITHOUT ANY WARRANTY; without even the implied
+ warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ GNU General Public License for more details.
+ 
+ You should have received a copy of the GNU General Public
+ License along with this library; if not, write to the Free Software
+ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
+-->
+<meta http-equiv="X-UA-Compatible" content="chrome=1" />
+<title>WebNEZ - a game console music player for the Web</title>
+
+<meta name="description" content="Experimental JavaScript version of 
+nezplay/NEZplug++; it supports .nsf, .kss, .gbr, .gbs, .hes, .ay, .sgc formats">
+<meta name="author" content="Juergen Wothke">
+<meta name="keywords" content="Web Audio API, HTML5, JavaScript">
+
+<link href="stdlib/font.css" rel="stylesheet" type="text/css">
+<link href="stdlib/common.css" rel="stylesheet" type="text/css">
+<link href="add_on.css" rel="stylesheet" type="text/css">
+
+<link rel="image_src" href="screenshot.gif" />
+<meta property="og:image" content="http://www.wothke.ch/webNEZ/screenshot.gif" />
+
+<link rel="icon" href="favicon.ico" type="image/x-icon">
+<link rel="shortcut icon" type="image/x-icon" href="favicon.ico" />
+<link type="image/x-icon" href="favicon.ico" />
+
+<script type="text/javascript" src="stdlib/jquery1.11.min.js"></script>
+<script type="text/javascript" src="stdlib/jquery.details.min.js"></script>
+<script type="text/javascript" src="stdlib/scriptprocessor_player.min.js"></script>
+
+<script>window.openDetails=false;</script>
+<script type="text/javascript" src="stdlib/mini_display.js"></script>
+<script type="text/javascript" src="stdlib/mini_controls.js"></script>
+
+<script type="text/javascript" src="backend_nez.js"></script>
+<script>
+var playerControls;
+var	songDisplay;
+	
+// configure what music infos to display in SongDisplay
+NEZDisplayAccessor = (function(){ var $this = function (doGetSongInfo) {
+		$this.base.call(this, doGetSongInfo);
+	}; 
+	extend(DisplayAccessor, $this, {
+		getDisplayTitle: function() 	{ return "webNEZ";},
+		getDisplaySubtitle: function() 	{ return "game console music";},
+		getDisplayLine1: function() { return this.getSongInfo().title + (this.getSongInfo().artist.length ? (" ("+this.getSongInfo().track+")") : ""); },
+		getDisplayLine2: function() { return !this.getSongInfo().artist.length ? ("track "+this.getSongInfo().track) : this.getSongInfo().artist; },
+		getDisplayLine3: function() { return this.getSongInfo().copyright; }
+	});	return $this; })();
+		
+// link player events to "controls" and "display"
+function doOnTrackEnd(){
+	if (playerControls) playerControls.playNextSong();
+}
+function doOnTrackReadyToPlay(){ 	
+	ScriptNodePlayer.getInstance().play();
+	songDisplay.redrawSongInfo();
+}
+function doOnPlayerReady() {
+	if (playerControls) playerControls.playNextSong();
+}
+
+function init() {
+	// --------------------------- music player -----------------------
+	var basePath= '';		// not needed here
+	ScriptNodePlayer.createInstance(new NEZBackendAdapter(), basePath, [], true, doOnPlayerReady,
+										doOnTrackReadyToPlay, doOnTrackEnd);
+		
+	// --------------------------- UI - basic player controls --------------
+	var songs = [
+		"music/xevious.hes;2;7",
+		"music/xevious.hes;3;11",
+		"music/pastel lime.hes;4;20",
+		"music/out run.hes;3;87",
+		"music/galaga 88.hes;10;42",
+		"music/pastel lime.hes;3;114",
+		"music/battle lode runner.hes;2;60",
+		"music/G-3380.sgc;0;60",
+		"music/G-3327.sgc;2;60",
+		
+	];
+	playerControls= new BasicPlayerControls(songs, true, false,
+				(function(someSong) {
+						var arr= someSong.split(";");					
+						var track= arr.length>1?parseInt(arr[1]):-1;
+						var timeout= arr.length>2?parseInt(arr[2]):-1;
+
+						var options= {};
+						options.track= isNaN(track) ? -1 : track;
+						options.timeout= isNaN(timeout) ? -1 : timeout;
+						return [arr[0], options];
+					})
+				);
+
+	songDisplay= new SongDisplay(new NEZDisplayAccessor((function(){return playerControls.getSongInfo();})), 
+								[0x505050,0xffffff,0x404040,0xffffff], 1, 1, (function(){playerControls.animate()}));
+
+	playerControls.playNextSong();
+}
+</script>
+<script type="text/javascript" src="stdlib/analytics.js"></script>
+</head>
+
+<body onload="init();">
+<div class="tooltip" id="tooltip" alt= "This is a hobby project, but it costs not only time to regularily maintain this site but also money to pay for the internet service provider (etc). If you want to keep this site up and running.. or if you just like my work (see https://jwothke.wordpress.com/) and you'd like to see more of it in the future, please make a contribution. Thank you!"></div>
+
+<details>
+  <summary>What's this?</summary>
+  <div>
+  <p>WebNEZ: Experimental JavaScript/HTML5 version of <a href="https://github.com/BouKiCHi/nezplay" target="_blank">nezplay</a>/
+<a href="http://offgao.net/program/nezplug++.html" target="_blank">NEZplug++</a>. This "swiss army knife" type of player seems to
+do an adequate job of emulating a range of systems like Famicom(NES), Game Gear, Game Boy, TurboGrafx-16(PC-Engine), MSX, 
+ZX Spectrum, etc. (You may still use special purpose emulators where needed, e.g.  <a href="https://www.wothke.ch/webTurbo" target="_blank">webTurbo</a> for "Hudson Entertainment Sound" (.hes) or 
+<a href="https://www.wothke.ch/spectreZX" target="_blank">spectreZX</a> for ZXSpectrum (.ay, etc).</p>
+ 
+  <p>Bring your own files (.nfs, .kss, .gbr, .gbs, .hes,.ay, .sgc) by dropping them onto the consoles. Respective files can be found for example on 
+  <a href="https://ftp.modland.com/pub/modules/" target="_blank">modland.com</a>.</p>
+ 
+  <p>2018 by Juergen Wothke  (The source code can be found <a target="_blank" href="https://github.com/wothke/">here</a>.)</p>
+ 
+  
+  <p>This page does not use any plugins but is based exclusively on the WebAudio API. The audio samples here 
+  are completely calculated within JavaScript by running the NEZplug emulator logic.</p>
+ 
+  <p>Please use the below controls to navigate between the songs that you have dropped on the player:
+  <span id="controls"></span>
+ </div>
+</details>
+<aside></aside>
+<section>
+  <div id="logo">
+		<!-- in new Chrome the SHIT reflections disapear dependig on the canvas height.. what a fucking joke -->
+		<div id="moz-reflect-logo"><canvas  id="logoCanvas"  width="270" height="100"></canvas></div>	
+  </div>
+  
+  <div id="spectrum" >
+		<!-- use "hight" greater than 80 and the fucking reflection is gone.. FUCK YOU IDIOTS -->
+		<div id="moz-reflect-spectrum"><canvas id="spectrumCanvas" width="800" height="80"></canvas></div>
+  </div>
+  <div id="drop" class="drop"><img src="NEZ.gif"/></div><!--see BasicPlayerControls-->
+</section>
+</body>
+</html>
