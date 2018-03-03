@@ -881,8 +881,8 @@ static Uint32 load(GBRDMG *THIS_, Uint8 *pData, Uint32 uSize)
 		if (uSize < 0x20) return NESERR_FORMAT;
 		THIS_->maxsong = 256;
 		THIS_->startsong = 1;
-		SONGINFO_SetStartSongNo(THIS_->startsong);
-		SONGINFO_SetMaxSongNo(THIS_->maxsong);
+		SONGINFO_SetStartSongNo(pNezPlay->song, THIS_->startsong);
+		SONGINFO_SetMaxSongNo(pNezPlay->song, THIS_->maxsong);
 		THIS_->bankromnum = pData[4];
 		if (!THIS_->bankromnum) return NESERR_FORMAT;
 		THIS_->bankromfirst[0] = pData[5];
@@ -949,8 +949,8 @@ First TMC          : %02XH"
 		if (uSize < 0x70) return NESERR_FORMAT;
 		THIS_->maxsong = pData[0x04];
 		THIS_->startsong = pData[0x05];
-		SONGINFO_SetStartSongNo(THIS_->startsong);
-		SONGINFO_SetMaxSongNo(THIS_->maxsong);
+		SONGINFO_SetStartSongNo(pNezPlay->song, THIS_->startsong);
+		SONGINFO_SetMaxSongNo(pNezPlay->song, THIS_->maxsong);
 		THIS_->bankromfirst[0] = 0;
 		THIS_->bankromfirst[1] = 1;
 		THIS_->loadaddr = GetWordLE(pData + 0x06);
@@ -1028,15 +1028,15 @@ Use INT           : %d"
 		THIS_->bankromnum = (Uint8)(size >> 14);
 		
 	}
-	SONGINFO_SetChannel(2);
-	SONGINFO_SetExtendDevice(0);
-	SONGINFO_SetInitAddress(THIS_->initaddr);
+	SONGINFO_SetChannel(pNezPlay->song, 2);
+	SONGINFO_SetExtendDevice(pNezPlay->song, 0);
+	SONGINFO_SetInitAddress(pNezPlay->song, THIS_->initaddr);
 	//---+
 	if (THIS_->useINT == 1)
-	SONGINFO_SetPlayAddress(THIS_->playaddr);
+	SONGINFO_SetPlayAddress(pNezPlay->song, THIS_->playaddr);
 	else
 	//---+
-	SONGINFO_SetPlayAddress((THIS_->timerflag & 1) ? THIS_->vsyncaddr : THIS_->timeraddr);
+	SONGINFO_SetPlayAddress(pNezPlay->song, (THIS_->timerflag & 1) ? THIS_->vsyncaddr : THIS_->timeraddr);
 	THIS_->bankrom = (Uint8 *)XMALLOC(THIS_->bankromnum << 14);
 	if (!THIS_->bankrom) return NESERR_SHORTOFMEMORY;
 	XMEMSET(THIS_->bankrom, 0, THIS_->bankromnum << 14);
