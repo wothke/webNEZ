@@ -23,6 +23,21 @@
 */
 
 
+/*
+	where to find test files: 
+	
+	*.sgc (SGC) https://www.zophar.net/music/sega-game-gear-sgc/ (some files use some vgm format that doesn't work here)
+	.kss (KSSX, KSCC, ) https://www.zophar.net/music/kss
+	.hes (HESM) https://ftp.modland.com/pub/modules/HES/
+	.nsf (NESM) https://ftp.modland.com/pub/modules/Nintendo%20Sound%20Format/ 
+	.ay (ZXAY) https://zxart.ee/eng/music/
+	.gbr(GBRF, GBS) https://ftp.modland.com/pub/modules/Gameboy%20Sound%20System%20GBR/
+	(NESL)
+	
+	
+	
+*/
+
 #include <emscripten.h>
 #include <stdio.h>
 #include <stdlib.h>     
@@ -41,6 +56,8 @@
 #else
 #define EMSCRIPTEN_KEEPALIVE
 #endif
+
+extern "C" Uint NEZLoad(Uint8 *pData, Uint uSize);
 
 
 std::string trim(const std::string& str) {
@@ -139,7 +156,7 @@ extern "C"  int EMSCRIPTEN_KEEPALIVE emu_load_file(char *filename, void * inBuff
 	if (emu_setup()) {
 		SONGINFO_Reset();	// e.g. HES does not set anything..
 		
-		if (!NSFLoad((uint8_t *)inBuffer, inBufSize)) {
+		if (!NEZLoad((uint8_t *)inBuffer, inBufSize)) {
 			
 			NESAudioFrequencySet(SAMPLE_FREQ);
 			NESAudioChannelSet(CHANNELS);

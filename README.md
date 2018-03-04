@@ -2,8 +2,8 @@
 
 Copyright (C) 2018 Juergen Wothke
 
-This is a JavaScript/WebAudio plugin of "NEZplug(++)" used to emulate music of various consoles (Famicom, 
-Game Gear, Game Boy, MSX, ZX Spectrum, Hudson, etc. This plugin is designed to work with my generic WebAudio 
+This is a JavaScript/WebAudio plugin of "NEZplug(++)" used to emulate music of various consoles: Famicom (.nes), 
+Game Gear, Game Boy, MSX (.kss), ZX Spectrum (.ay), Hudson (.hes), etc. This plugin is designed to work with my generic WebAudio 
 ScriptProcessor music player (see separate project). 
 
 It supposedly emulates the following sound chips:
