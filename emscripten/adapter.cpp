@@ -44,6 +44,7 @@
 #include <fstream>
 
 #include <handler.h>
+#include <nezglue_x.h>
 #include <audiosys.h>
 #include <songinfo.h>
 #include <m_nsf.h>

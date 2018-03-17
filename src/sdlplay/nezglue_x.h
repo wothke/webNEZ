@@ -1,23 +1,6 @@
 #ifndef __NEZGLUE_X__H
 #define __NEZGLUE_X__H
 
-#include <stdio.h>
-#include "nlg.h"
-
-#ifdef __ANDROID__
-
-void output_log(const char *format, ...);
-
-#define OUTPUT_LOG(...) output_log(__VA_ARGS__)
-
-#else
-
-#define OUTPUT_LOG(...) {}
-
-#endif
-
-#define MASKSET(x) XMEMSET(x, 1, sizeof(x))
-#define ZEROSET(x) XMEMSET(x, 0, sizeof(x))
 
 // direct access
 
@@ -72,28 +55,9 @@ typedef struct
     
     unsigned char  psg_adr;
     unsigned char  opm_adr[2];
-    NLGCTX *nlgctx;
 } NSF_STATE;
 
 extern NSF_STATE nsf_state;
-
-/* Debug */
-enum REG_TAG
-{
-    REG_PC,
-    REG_A,
-    REG_X,
-    REG_Y,
-    REG_S,
-    REG_P,
-    
-    REG_Z80_PC,
-    REG_Z80_AF,
-    REG_Z80_BC,
-    REG_Z80_DE,
-    REG_Z80_HL,
-    REG_Z80_SP
-};
 
 
 #endif

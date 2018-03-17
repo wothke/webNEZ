@@ -6,8 +6,6 @@
 extern "C" {
 #endif
     
-#include "nezglue_x.h"
-    
 #include "../nestypes.h"
 
 typedef struct {

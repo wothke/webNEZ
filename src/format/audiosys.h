@@ -33,8 +33,6 @@ enum
    NES_AUDIO_FILTER_WEIGHTED,
    NES_AUDIO_FILTER_LOWPASS_WEIGHTED
 };
-    
-#include "nezglue_x.h"
 
 /* externs */
     

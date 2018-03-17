@@ -8,6 +8,7 @@
 #include "audiosys.h"
 #include "songinfo.h"
 
+#include "nezglue_x.h"
 #include "device/kmsnddev.h"
 #include "m_hes.h"
 #include "m_gbr.h"
@@ -16,6 +17,7 @@
 #include "m_kss.h"
 #include "m_nsd.h"
 #include "m_sgc.h"
+
 
 #define GetDwordLEM(p) (Uint32)((((Uint8 *)p)[0] | (((Uint8 *)p)[1] << 8) | (((Uint8 *)p)[2] << 16) | (((Uint8 *)p)[3] << 24)))
 
