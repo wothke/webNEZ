@@ -19,10 +19,14 @@
 #include "s_opl.h"
 #include "s_deltat.h"
 
-#define PG_SHIFT 10 /* fix */
+#define PG_SHIFT 13 /* fix */
 #define CPS_SHIFTE 20
 #define CPS_SHIFTP 14
 #define LFO_SHIFT 16
+#define DP_BITS 23
+#define NOISE_BITS 14
+
+#define OUTPUT_BUFFER 2
 
 #define OPLL_INST_WORK  0x40
 #define OPLL_INST_WORK2 (OPLL_INST_WORK + 8 * 0x13)
@@ -30,7 +34,18 @@
 #define AR_BITS   6 /* fix */
 #define AR_SHIFT 14 /* fix */
 #define EG_SHIFT 15 /* fix */
+#define EG_SHIFT2 32768
+#define NOISE_SHIFT 9
+#define OUTPUT_VOL 1/2
 
+#define FM_FREQ 44100.0
+#define VOLUME_BITS 0
+
+//1にすると、ローパスフィルタがかかるが、重すぎて使い物になりまへん。
+#define LOWPASS_FILTER 0
+
+
+//#define AR_PHASEMAX 0x7fffffff
 #define AR_PHASEMAX (((1 << AR_BITS) - 1) << AR_SHIFT)
 #define EG_PHASEMAX (127 << EG_SHIFT)
 #define EG_KEYOFF   (128 << EG_SHIFT)
@@ -51,13 +66,13 @@
 #endif
 
 
-#define TESTING_OPTIMIZE_AME 1
+#define TESTING_OPTIMIZE_AME 0
 #define USE_FBBUF 1
 
 typedef struct {
 	Uint32 phase;
 	Uint32 spd;
-	Uint32 rng;
+	Uint32 pgout;
 } OPL_PG;
 
 enum {
@@ -72,6 +87,7 @@ enum {
 
 typedef struct {
 	Uint32 phasear;
+	Uint32 phasearc;
 	Uint32 phase;
 	Uint32 spd[EG_MODE_NUM];
 	Uint32 dr_phasemax;
@@ -124,6 +140,9 @@ typedef struct {
 	Uint8 rr;
 	Uint8 tl;
 	Uint8 wf;
+	Uint8 type;
+	Uint8 *tone;
+	Int32 outputbf[OUTPUT_BUFFER];
 } OPL_OP;
 
 typedef struct {
@@ -179,7 +198,16 @@ typedef struct {
 		Uint8 enable;
 	} common;
 	Uint8 regs[0x100];
+	Uint8 oplregs[0x100];
+	Uint8 opllregs[0x100];
 	Uint8 opl_type;
+	Uint32 freqp;
+	Uint32 freq;
+	long output;
+	Int32 fbbuf;
+	double fb;
+	Uint32 rng;
+	Uint32 phase;
 } OPLSOUND;
 
 static Uint8 romtone[3][16 * 19] =
@@ -188,21 +216,65 @@ static Uint8 romtone[3][16 * 19] =
 #include "ill/i_fmpac.h"
 	},
 	{
-#include "ill/i_fmunit.h"
+#include "ill/i_fmunit.h" // ←SMSのFM音源はFM-PACと同じ「YM2413」を使ってるのであんまり意味が無い
 	},
 	{
-#include "ill/i_vrc7.h"
+#include "ill/i_vrc7.h" // ←VRC7は明らかに音色が違う。ラグランジュポイントをYM2413で鳴らしたら、ベース音が残念な音色になった。
 	},
 };
 
-#define DEVICE OPLL
-#include "assist.h"
+#if (((-1) >> 1) == -1)
+/* RIGHT SHIFT IS SIGNED */
+#define SSR(x, y) (((Int32)x) >> (y))
+#else
+/* RIGHT SHIFT IS UNSIGNED */
+#define SSR(x, y) (((x) >= 0) ? ((x) >> (y)) : (-((-(x) - 1) >> (y)) - 1))
+#endif
+
+const static Uint8 ksltable[4]={15,2,1,0};
+const static Uint8 hhouttable[8]={
+	0x34, //010
+	0x0d, //001
+	0x8d, //101
+	0xb4, //110
+	0x8d, //101
+	0xb4, //110
+	0x8d, //101
+	0xb4, //110
+};
+const static Uint8 rymouttable[4]={
+	      
+	0x40, //01
+	0xc0, //11
+	0xc0, //11
+	0xc0, //11
+};
 
 __inline static void SetOpOff(OPL_OP *opp)
 {
 	opp->eg.mode = EG_MODE_OFF;
 	opp->eg.phase = EG_KEYOFF;
 	opp->enable = 0;
+}
+#define CalcFbbuf(x,y)	CalcFbbuf2(x,y)
+#if LOWPASS_FILTER
+#define CalcFbbuf2(x,y) {\
+	x = (x + y / sndp->fb) / (1+1/sndp->fb);\
+}
+#else
+#define CalcFbbuf2(x,y) {\
+	x = (x + y) / 2;\
+}
+#endif
+
+__inline static Int32 CalcOutputBuffer(Int32 output, Int32 *outputbf){
+	Uint8 a;
+	Int64 buffer,c;
+	for(a=OUTPUT_BUFFER-1;a>0;a--) outputbf[a]=outputbf[a-1];
+	outputbf[0] = output;
+	buffer=0;c=0;
+	for(a=0;a<OUTPUT_BUFFER;a++)buffer+=outputbf[a];
+	return buffer/OUTPUT_BUFFER;
 }
 
 __inline static void EgStep(OPLSOUND *sndp, OPL_OP *opp)
@@ -231,9 +303,12 @@ __inline static void EgStep(OPLSOUND *sndp, OPL_OP *opp)
 		case EG_MODE_SUSTINE:
 		case EG_MODE_RELEASE:
 			opp->eg.phase += opp->eg.spd[opp->eg.mode];
-			if (opp->eg.phase >= EG_PHASEMAX) SetOpOff(opp);
+			if (opp->eg.phase >= EG_PHASEMAX){
+				SetOpOff(opp);
+			}
 			break;
 		case EG_MODE_SUSHOLD:
+			break;
 		case EG_MODE_OFF:
 			break;
 	}
@@ -246,31 +321,60 @@ static void __fastcall OpStep(OPLSOUND *sndp, OPL_OP *opp)
 			opp->pg.phase += (opp->pg.spd * sndp->lfo[LFO_UNIT_PM].output) >> PM_SHIFT;
 		else
 			opp->pg.phase += opp->pg.spd;
+	opp->pg.phase &= (1<<DP_BITS)-1;
+	opp->pg.pgout = opp->pg.phase >> (DP_BITS - NOISE_SHIFT);
 }
 
-__inline static void OpStepNG(OPLSOUND *sndp, OPL_OP *opp)
+__inline static void OpStepNG(OPLSOUND *sndp)
 {
-	Uint32 step;
-	EgStep(sndp, opp);
-	opp->pg.phase += opp->pg.spd;
-	step = opp->pg.phase >> opp->nst/*(PG_SHIFT + 5)*/;
-	opp->pg.phase &=  (1 << opp->nst/*(PG_SHIFT + 5)*/) - 1;
-	while (step--)
+	sndp->phase += sndp->common.cpsp;
+	while (sndp->phase >= 1<<NOISE_BITS)
 	{
-		opp->pg.rng ^= ((opp->pg.rng & 1) << 16) + ((opp->pg.rng & 1) << 13);
-		opp->pg.rng >>= 1;
+		sndp->phase -= 1<<NOISE_BITS;
+//		sndp->rng ^= ((sndp->rng & 1) << 16) + ((sndp->rng & 1) << 13);
+		if(sndp->rng & 1)sndp->rng^= 0x8003020;
+		sndp->rng >>= 1;
 	}
 }
 
-#if (((-1) >> 1) == -1)
-/* RIGHT SHIFT IS SIGNED */
-#define SSR(x, y) (((Int32)x) >> (y))
+
+__inline static void OpSynthMod(OPLSOUND *sndp, OPL_OP *opp)
+{
+	if (opp->enable)
+	{
+		Uint32 tll;
+		Int32 output;
+		OpStep(sndp, opp);
+		tll = opp->tll + (opp->eg.phase >> EG_SHIFT);
+		tll = (tll >= (1 << TLLTBL_BITS)) ? LOG_KEYOFF : sndp->common.tll2logtbl[tll];
+		tll += opp->tl_ofs;
+#if TESTING_OPTIMIZE_AME
+		tll += *opp->amin;
 #else
-/* RIGHT SHIFT IS UNSIGNED */
-#define SSR(x, y) (((x) >= 0) ? ((x) >> (y)) : (-((-(x) - 1) >> (y)) - 1))
+		if (opp->flag & FLAG_AME) tll += sndp->lfo[LFO_UNIT_AM].output;
 #endif
-
-
+		tll += opp->sintable[sndp->common.sintablemask & (opp->input + (opp->pg.phase >> PG_SHIFT))];
+		output = LogToLin(sndp->logtbl, tll, -8 + ((LOG_LIN_BITS + 1) - (SINTBL_BITS + 2))-1);
+		if (opp->fb)
+		{
+#if USE_FBBUF == 1
+			Int32 fbtmp;
+			fbtmp = opp->fbbuf + output;
+			opp->fbbuf = output;
+			opp->input = SSR(fbtmp, (9 - opp->fb));
+#else
+#if USE_FBBUF == 2
+			opp->fbbuf = CalcOutputBuffer(output, opp->outputbf);
+			opp->input = SSR(opp->fbbuf, (8 - opp->fb));
+#else
+			opp->input = SSR(output, (8 - opp->fb));
+#endif
+#endif
+		}
+		opp[1].input = output;
+	}
+}
+/*
 __inline static void OpSynthMod(OPLSOUND *sndp, OPL_OP *opp)
 {
 	if (opp->enable)
@@ -302,7 +406,42 @@ __inline static void OpSynthMod(OPLSOUND *sndp, OPL_OP *opp)
 		opp[1].input = output;
 	}
 }
+*/
 
+__inline static Int32 OpSynthCarFb(OPLSOUND *sndp, OPL_OP *opp)
+{
+	if (opp->enable)
+	{
+		Uint32 tll;
+		OpStep(sndp, opp);
+		tll = opp->tll + (opp->eg.phase >> EG_SHIFT);
+		tll = (tll >= (1 << TLLTBL_BITS)) ? LOG_KEYOFF : sndp->common.tll2logtbl[tll];
+		tll += opp->tl_ofs;
+#if TESTING_OPTIMIZE_AME
+		tll += *opp->amin;
+#else
+		if (opp->flag & FLAG_AME) tll += sndp->lfo[LFO_UNIT_AM].output;
+#endif
+		tll += opp->sintable[sndp->common.sintablemask & (opp->input + (opp->pg.phase >> PG_SHIFT))];
+		if (opp->fb)
+		{
+#if USE_FBBUF
+			Int32 output, fbtmp;
+			output = LogToLin(sndp->logtbl, tll, -8 + ((LOG_LIN_BITS + 1) - (SINTBL_BITS + 2)) -1);
+			fbtmp = opp->fbbuf + output;
+			opp->fbbuf = output;
+			opp->input = SSR(fbtmp, (9 - opp->fb));
+#else
+			Int32 output;
+			output = LogToLin(sndp->logtbl, tll, -8 + ((LOG_LIN_BITS + 1) - (SINTBL_BITS + 2)) -1);
+			opp->input = SSR(output, (8 - opp->fb));
+#endif
+		}
+		return LogToLin(sndp->logtbl, tll + sndp->common.mastervolume, -8 + LOG_LIN_BITS - 19 - opp->lvl);
+	}
+	return 0;
+}
+/*
 __inline static Int32 OpSynthCarFb(OPLSOUND *sndp, OPL_OP *opp)
 {
 	if (opp->enable)
@@ -336,7 +475,28 @@ __inline static Int32 OpSynthCarFb(OPLSOUND *sndp, OPL_OP *opp)
 	}
 	return 0;
 }
+*/
 
+__inline static Int32 OpSynthCar(OPLSOUND *sndp, OPL_OP *opp)
+{
+	OpStep(sndp, opp);
+	if (opp->enable)
+	{
+		Uint32 tll;
+		tll = opp->tll + (opp->eg.phase >> EG_SHIFT);
+		tll = (tll >= (1 << TLLTBL_BITS)) ? LOG_KEYOFF : sndp->common.tll2logtbl[tll];
+		tll += opp->tl_ofs;
+#if TESTING_OPTIMIZE_AME
+		tll += *opp->amin;
+#else
+		if (opp->flag & FLAG_AME) tll += sndp->lfo[LFO_UNIT_AM].output;
+#endif
+		tll += opp->sintable[sndp->common.sintablemask & (opp->input + (opp->pg.phase >> PG_SHIFT))];
+		return LogToLin(sndp->logtbl, tll + sndp->common.mastervolume, -8 + LOG_LIN_BITS - 19 - opp->lvl -1);
+	}
+	return 0;
+}
+/*
 __inline static Int32 OpSynthCar(OPLSOUND *sndp, OPL_OP *opp)
 {
 	if (opp->enable)
@@ -356,34 +516,129 @@ __inline static Int32 OpSynthCar(OPLSOUND *sndp, OPL_OP *opp)
 	}
 	return 0;
 }
+*/
 
-__inline static Int32 OpSynthTom(OPLSOUND *sndp, OPL_OP *opp)
+__inline static Int32 OpSynthTom(OPLSOUND *sndp, OPL_OP *opp, OPL_OP *opp2)
 {
 	if (opp->enable)
 	{
 		Uint32 tll;
-		OpStep(sndp, opp);
-		tll = opp->tll + (opp->eg.phase >> EG_SHIFT);
+		Int32 output;
+		tll = opp->tll + (opp->eg.phase / EG_SHIFT2);
 		tll = (tll >= 128 - 16) ? LOG_KEYOFF : sndp->common.tll2logtbl[tll];
 		tll += opp->tl_ofs;
 		tll += opp->sintable[sndp->common.sintablemask & (opp->pg.phase >> PG_SHIFT)];
-		return LogToLin(sndp->logtbl, tll + sndp->common.mastervolume, -8 + LOG_LIN_BITS - 19 - opp->lvl);
+		output = LogToLin(sndp->logtbl, tll + sndp->common.mastervolume, -8 + LOG_LIN_BITS - 18 - opp->lvl);
+		return output;
 	}
 	return 0;
 }
 
 
-static Int32 __fastcall OpSynthRym(OPLSOUND *sndp, OPL_OP *opp)
+static Int32 __fastcall OpSynthRym(OPLSOUND *sndp, OPL_OP *opp, OPL_OP *opp2)
 {
+/*
+	if (opp2->enable)
+	{
+		Uint32 tll,c1,c2;
+		Int32 output=0;
+		tll = opp2->tll + (opp2->eg.phase / EG_SHIFT2);
+		tll = (tll >= (1 << TLLTBL_BITS)) ? LOG_KEYOFF : sndp->common.tll2logtbl[tll];
+		tll += opp2->tl_ofs;
+		c1 = (((opp->pg.pgout >> (NOISE_SHIFT - 8)) & 1) 
+			^ ((opp->pg.pgout >> (NOISE_SHIFT - 3)) & 1)) 
+			| ((opp->pg.pgout >> (NOISE_SHIFT - 7)) & 1);
+		c2 = (((opp2->pg.pgout >> (NOISE_SHIFT - 7)) & 1)
+			^ ((opp2->pg.pgout >> (NOISE_SHIFT - 5)) & 1));
+		output = LogToLin(sndp->logtbl, tll + sndp->common.mastervolume + LinToLog(sndp->logtbl, rymouttable[(c1<<1) | c2]), -13 + LOG_LIN_BITS - 18 - opp2->lvl);
+
+		return output;
+	}
+	return 0;
+*/
+//	OpStep(sndp, opp);
+	if (opp2->enable)
+	{
+		Uint32 tll;
+		Int32 output;
+		tll = opp2->tll + (opp2->eg.phase / EG_SHIFT2);
+		tll = (tll >= (1 << TLLTBL_BITS)) ? LOG_KEYOFF : sndp->common.tll2logtbl[tll];
+		tll += opp2->tl_ofs;
+		if( (((opp->pg.pgout >> (NOISE_SHIFT - 8)) & 1) 
+			^ ((opp->pg.pgout >> (NOISE_SHIFT - 1)) & 1) 
+			| ((opp->pg.pgout >> (NOISE_SHIFT - 7)) & 1)) 
+			^ ( ((opp2->pg.pgout >> (NOISE_SHIFT - 7)) & 1)
+			& !((opp2->pg.pgout >> (NOISE_SHIFT - 5)) & 1))
+		)tll += 1;
+//		tll += (sndp->rng & 1);
+//		if(sndp->ch[7].op[0].rkey)
+		output = LogToLin(sndp->logtbl, tll + sndp->common.mastervolume, -8 + LOG_LIN_BITS - 20 - opp2->lvl);
+		return output;
+}
+	return 0;
+
+}
+
+static Int32 __fastcall OpSynthHat(OPLSOUND *sndp, OPL_OP *opp, OPL_OP *opp2)
+{
+/*
+	if (opp->enable)
+{
+		Uint32 tll,c1,c2,c3;
+		Int32 output=0;
+		tll = opp->tll + (opp->eg.phase / EG_SHIFT2);
+		tll = (tll >= (1 << TLLTBL_BITS)) ? LOG_KEYOFF : sndp->common.tll2logtbl[tll];
+		tll += opp->tl_ofs;
+		c1 = (((opp->pg.pgout >> (NOISE_SHIFT - 8)) & 1) 
+			^ ((opp->pg.pgout >> (NOISE_SHIFT - 3)) & 1))
+			| ((opp->pg.pgout >> (NOISE_SHIFT - 7)) & 1);
+		c2 = (((opp2->pg.pgout >> (NOISE_SHIFT - 7)) & 1)
+			^ ((opp2->pg.pgout >> (NOISE_SHIFT - 5)) & 1));
+		c3 = (sndp->rng & 1);
+		output = LogToLin(sndp->logtbl, tll + sndp->common.mastervolume + LinToLog(sndp->logtbl, hhouttable[(c1<<2) | (c2<<1) | c3]), -13 + LOG_LIN_BITS - 16 - opp->lvl)*3;
+
+		return output;
+	}
+	return 0;
+*/
+//	OpStep(sndp, opp);
 	if (opp->enable)
 	{
 		Uint32 tll;
-		OpStepNG(sndp, opp);
-		tll = opp->tll + (opp->eg.phase >> EG_SHIFT) + 0x10/* +6dB */;
+		Int32 output=0;
+		tll = opp->tll + (opp->eg.phase / EG_SHIFT2);
 		tll = (tll >= (1 << TLLTBL_BITS)) ? LOG_KEYOFF : sndp->common.tll2logtbl[tll];
 		tll += opp->tl_ofs;
-		tll += (opp->pg.rng & 1);
-		return LogToLin(sndp->logtbl, tll + sndp->common.mastervolume, -8 + LOG_LIN_BITS - 19 - opp->lvl);
+		if( (((opp->pg.pgout >> (NOISE_SHIFT - 8)) & 1) 
+			^ ((opp->pg.pgout >> (NOISE_SHIFT - 1)) & 1) 
+			| ((opp->pg.pgout >> (NOISE_SHIFT - 7)) & 1)) 
+			^ ( ((opp2->pg.pgout >> (NOISE_SHIFT - 7)) & 1)
+			& !((opp2->pg.pgout >> (NOISE_SHIFT - 5)) & 1))
+		)tll += 1;
+		output = LogToLin(sndp->logtbl, tll + sndp->common.mastervolume, -8 + LOG_LIN_BITS - 19 - opp->lvl);
+
+//		tll = opp->tll + (opp->eg.phase / EG_SHIFT2);
+//		tll = (tll >= (1 << TLLTBL_BITS)) ? LOG_KEYOFF : sndp->common.tll2logtbl[tll];
+//		tll += opp->tl_ofs;
+		output += LogToLin(sndp->logtbl, tll + sndp->common.mastervolume + (sndp->rng & 1), -8 + LOG_LIN_BITS - 19 - opp->lvl);
+		return output;
+	}
+	return 0;
+}
+
+static Int32 __fastcall OpSynthSnr(OPLSOUND *sndp, OPL_OP *opp, OPL_OP *opp2)
+{
+	if (opp2->enable)
+	{
+		Uint32 tll;
+		Int32 output=0,outval;
+
+		tll = opp2->tll + (opp2->eg.phase / EG_SHIFT2);
+		tll = (tll >= (1 << TLLTBL_BITS)-16) ? LOG_KEYOFF : sndp->common.tll2logtbl[tll];
+		tll += opp2->tl_ofs;
+		outval = LogToLin(sndp->logtbl, tll + sndp->common.mastervolume + 1, -8 + LOG_LIN_BITS - 17 - opp2->lvl);
+
+		return outval * ((((((opp->pg.pgout) >> 7) & 1))*2-1) + ((sndp->rng & 1) * 3-1));
 	}
 	return 0;
 }
@@ -400,55 +655,91 @@ static void sndsynth(void *sp, Int32 *p)
 {
 	OPLSOUND *sndp = sp;
 
-	Int32 accum[2] = { 0, 0 };
+	long accum[2] = { 0, 0 };
+//	int i = 0 ,count;
+//	count = (FM_FREQ-sndp->freqp)/sndp->freq;
+//	if(count){
+//		sndp->output = 0;
+//		for(i=0;sndp->freqp < FM_FREQ;sndp->freqp += sndp->freq ,i++){
+//			accum[0] = 0;
 	if (sndp->common.enable)
 	{
 		Uint32 i, rch;
+				OpStepNG(sndp);
 		for (i = 0; i < LFO_UNIT_NUM; i++) LfoStep(&sndp->lfo[i]);
-		rch = sndp->common.rmode ? 7 : 9;
+				rch = sndp->opl_type == OPL_TYPE_VRC7 ? 6 : (sndp->common.rmode ? 7 : 9);
+				if(rch==9)
 		for (i = 0; i < rch; i++)
 		{
-            if (!chmask[i]) continue;
-            
 			if (sndp->ch[i].op[0].modcar)
 				OpSynthMod(sndp, &sndp->ch[i].op[0]);
 			else
-				accum[0] += OpSynthCarFb(sndp, &sndp->ch[i].op[0]);
-			accum[0] += OpSynthCar(sndp, &sndp->ch[i].op[1]);
+							accum[0] += OpSynthCarFb(sndp, &sndp->ch[i].op[0]) * chmask[DEV_YM2413_CH1+i];
+						accum[0] += OpSynthCar(sndp, &sndp->ch[i].op[1]) * chmask[DEV_YM2413_CH1+i];
 		}
-		if (sndp->common.rmode)
+				else
+					for (i = 0; i < rch; i++)
 		{
-            if (chmask[7])
-            {
-                accum[0] += OpSynthRym(sndp, &sndp->ch[7].op[0]);
-                accum[0] += OpSynthRym(sndp, &sndp->ch[7].op[1]);
+						if (sndp->ch[i].op[0].modcar)
+							OpSynthMod(sndp, &sndp->ch[i].op[0]);
+						else{
+							if(i==6) accum[0] += OpSynthCarFb(sndp, &sndp->ch[i].op[0]) * chmask[DEV_YM2413_BD];
+							else     accum[0] += OpSynthCarFb(sndp, &sndp->ch[i].op[0]) * chmask[DEV_YM2413_CH1+i];
+						}
+
+						if(i==6) accum[0] += OpSynthCar(sndp, &sndp->ch[i].op[1]) * chmask[DEV_YM2413_BD];
+						else     accum[0] += OpSynthCar(sndp, &sndp->ch[i].op[1]) * chmask[DEV_YM2413_CH1+i];
 			}
-            if (chmask[8])
+
+				if (sndp->common.rmode)
             {
-                accum[0] += OpSynthTom(sndp, &sndp->ch[8].op[0]);
-                accum[0] += OpSynthRym(sndp, &sndp->ch[8].op[1]);
-            }
+					OpStep(sndp, &sndp->ch[7].op[0]);
+					OpStep(sndp, &sndp->ch[7].op[1]);
+					OpStep(sndp, &sndp->ch[8].op[0]);
+					OpStep(sndp, &sndp->ch[8].op[1]);
+					accum[0] += OpSynthHat (sndp, &sndp->ch[7].op[0], &sndp->ch[8].op[1]) * chmask[DEV_YM2413_HH];
+					accum[0] += OpSynthSnr (sndp, &sndp->ch[7].op[0], &sndp->ch[7].op[1]) * chmask[DEV_YM2413_SD];
+					accum[0] += OpSynthTom (sndp, &sndp->ch[8].op[0], &sndp->ch[8].op[1]) * chmask[DEV_YM2413_TOM];
+					accum[0] += OpSynthRym (sndp, &sndp->ch[7].op[0], &sndp->ch[8].op[1]) * chmask[DEV_YM2413_TCY];
 		}
 	}
 	if (sndp->deltatpcm)
 	{
 		sndp->deltatpcm->synth(sndp->deltatpcm->ctx, accum);
 	}
+/*		#if USE_FBBUF
+			{
+				sndp->fbbuf /= 10;
+				sndp->fbbuf  = sndp->fbbuf*9 + accum[0]/10;
+				accum[0] = sndp->fbbuf;
+			}
+		#endif
+*/
+//			sndp->output += accum[0];
+//		}
+//	}
+//	sndp->freqp -= FM_FREQ;
+	
+	sndp->output = SSR(accum[0],VOLUME_BITS);
+//	sndp->output = (sndp->output / count)>>VOLUME_BITS;
 #if 0
 	/* NISE DAC */
-	if (accum[0] >= 0)
-		accum[0] =  (Int32)(((Uint32) accum[0]) & (((1 << 8) - 1) << (23 - 8)));
+		if (sndp->output >= 0)
+			sndp->output +=  (long)(((unsigned long) sndp->output) & (((1 << 16) - 1) << (23 - 8)));
 	else
-		accum[0] = -(Int32)(((Uint32)-accum[0]) & (((1 << 8) - 1) << (23 - 8)));
+			sndp->output += -(long)(((unsigned long)-sndp->output +1) & (((1 << 16) - 1) << (23 - 8)));
 #endif
-	p[0] += accum[0];
-	p[1] += accum[0];
+	#if 1
+		CalcFbbuf2(sndp->fbbuf,sndp->output);
+//		sndp->output += sndp->fbbuf;
+	#endif
+	p[0] += sndp->output;
+	p[1] += sndp->output;
 }
 
 static void sndvolume(void *sp, Int32 volume)
 {
 	OPLSOUND *sndp = sp;
-
 	if (sndp->deltatpcm) sndp->deltatpcm->volume(sndp->deltatpcm->ctx, volume);
 	volume = (volume << (LOG_BITS - 8)) << 1;
 	sndp->common.mastervolume = volume;
@@ -469,7 +760,7 @@ const static Uint8 mul_table[0x10]=
 };
 
 #define DB2TLL(x) (x * 2 / 375)
-const static Uint8 ksl_table[8][16]=
+const static Uint32 ksl_table[8][16]=
 {
 	{
 		DB2TLL(    0), DB2TLL(    0), DB2TLL(    0), DB2TLL(    0),
@@ -528,6 +819,7 @@ static Uint32 __fastcall rateconv(OPLSOUND *sndp, Uint32 rrr, Uint32 ksr)
 	if (!rrr) return 0;
 	rrr = rrr + (ksr >> 2);
 	if (rrr > 15) rrr = 15;
+	if (rrr == 0) return EG_KEYOFF;
 	return sndp->common.ratetbl[ksr & 3] >> (CPS_SHIFTE + 1 - rrr);
 }
 
@@ -570,7 +862,10 @@ static void __fastcall OpUpdateEG(OPLSOUND *sndp, OPL_CH *chp, OPL_OP *opp)
 
 static void __fastcall OpUpdateTLL(OPLSOUND *sndp, OPL_CH *chp, OPL_OP *opp)
 {
-	opp->tll = (opp->tl + (chp->ksb >> opp->ksl)) << 1;
+/*	if(!opp->type)
+		opp->tll = (opp->tl) << 1;
+	else
+*/		opp->tll = (opp->tl + ((chp->ksb>>1) >> ksltable[opp->ksl])) << 1;
 }
 
 
@@ -593,7 +888,8 @@ static void __fastcall oplsetopmul(OPLSOUND *sndp, OPL_CH *chp, OPL_OP *opp, Uin
 
 static void __fastcall oplsetopkstl(OPLSOUND *sndp, OPL_CH *chp, OPL_OP *opp, Uint32 v)
 {
-	opp->ksl = (v >> 6) ? (3 - (v >> 6)) : 15;	/* 0 / 1.5 / 3 / 6 db/OCT */
+//	opp->ksl = (v >> 6) ? (/*3 - */(v >> 6)) : 15;	/* 0 / 1.5 / 3 / 6 db/OCT */
+	opp->ksl = v >> 6;
 	opp->tl = v & 0x3f;	/* 0.75 db */
 	OpUpdateTLL(sndp, chp, opp);
 }
@@ -626,20 +922,28 @@ static void __fastcall oplsetopkey(OPLSOUND *sndp, OPL_OP *opp)
 		opp->prevkey = nextkey;
 		if (nextkey)
 		{
+			opp->eg.phase = EG_KEYOFF;
 			sndp->common.enable = 1;
 			opp->eg.mode = EG_MODE_ATTACK;
-			opp->eg.phase = EG_KEYOFF;
 			opp->enable = 1;
-			opp->eg.phasear = 0;
+			if(opp->eg.phase > EG_PHASEMAX)opp->eg.phasear = 0;
+			else opp->eg.phasear = ((EG_PHASEMAX-opp->eg.phase)>>(EG_SHIFT+1))<<AR_SHIFT;
+			//opp->eg.phasearc = 0;
+			//opp->input = 0;
+#if USE_FBBUF
+			opp->fbbuf = 0;
+#endif
+			opp->pg.phase = 0;
 		}
-		else if (!opp->modcar && opp->eg.mode != EG_MODE_OFF)
+		else if (!opp->modcar && opp->eg.mode != EG_MODE_OFF){
 			opp->eg.mode = EG_MODE_RELEASE;
 	}
+}
 }
 
 static void __fastcall oplsetchfreql(OPLSOUND *sndp, OPL_CH *chp, Uint32 v)
 {
-	chp->freql = v & 0xff;
+	chp->freql = (Uint8)(v & 0xff);
 	chp->ksb = ksl_table[chp->blk][(chp->freqh << 2) + (chp->freql >> 6)];
 	OpUpdatePG(sndp, chp, &chp->op[0]);
 	OpUpdatePG(sndp, chp, &chp->op[1]);
@@ -670,9 +974,10 @@ static void __fastcall oplsetchfbcon(OPLSOUND *sndp, OPL_CH *chp, Uint32 v)
 {
 	chp->op[0].fb = (v >> 1) & 7;
 #if USE_FBBUF
-	chp->op[0].fbbuf = 0;
+//	chp->op[0].fbbuf = 0;
+//	chp->op[1].fbbuf = 0;
 #endif
-	chp->con = v & 1;
+	chp->con = (v >> 0) & 1;
 	chp->op[0].modcar = (chp->con) ? 0 : 1;
 	OpUpdateEG(sndp, chp, &chp->op[0]);
 	chp->op[1].input = 0;
@@ -725,7 +1030,8 @@ static void __fastcall SetOpTone(OPLSOUND *sndp, OPL_OP *opp, Uint8 *tonep)
 	if (tonep[0] & 0x20) opp->flag |= FLAG_EGT;
 	if (tonep[0] & 0x10) opp->flag |= FLAG_KSR;
 	opp->mul = mul_table[tonep[0] & 0x0f] << 1;
-	opp->ksl = (tonep[2] >> 6) ? (3 - (tonep[2] >> 6)) : 15;
+//	opp->ksl = (tonep[2] >> 6) ? (3 - (tonep[2] >> 6)) : 15;
+	opp->ksl = (tonep[2] >> 6)&3;
 	opp->ar = tonep[4] >> 4;
 	opp->dr = tonep[4] & 0xf;
 	opp->sl = tonep[6] >> 4;
@@ -742,7 +1048,8 @@ static void __fastcall SetChTone(OPLSOUND *sndp, OPL_CH *chp, Uint8 *tonep, Uint
 	chp->op[0].wf = (tonep[3] >> 3) & 1;
 	chp->op[1].wf = (tonep[3] >> 4) & 1;
 #if USE_FBBUF
-	chp->op[0].fbbuf = 0;
+//	chp->op[0].fbbuf = 0;
+//	chp->op[1].fbbuf = 0;
 #endif
 	chp->op[1].input = 0;
 	OpUpdateWF(sndp, &chp->op[0]);
@@ -775,24 +1082,27 @@ static void __fastcall initrc_common(OPLSOUND *sndp, Uint32 rmode)
 	{
 		/* BD */
 		sndp->ch[6].op[0].modcar = 1;
-		sndp->ch[6].op[0].lvl = 0;
+		sndp->ch[6].op[0].lvl = 2;
 		OpUpdateEG(sndp, &sndp->ch[6], &sndp->ch[6].op[0]);
 		sndp->ch[6].op[1].input = 0;
-		sndp->ch[6].op[1].lvl = 2;
-		/* CYM */
-		sndp->ch[7].op[0].modcar = 0;
-		sndp->ch[7].op[0].lvl = 1;
+		sndp->ch[6].op[1].lvl = 1;
+		OpUpdateEG(sndp, &sndp->ch[6], &sndp->ch[6].op[1]);
+		/* HH */
+		sndp->ch[7].op[0].input = 0;
+		sndp->ch[7].op[0].lvl = 2;
 		OpUpdateEG(sndp, &sndp->ch[7], &sndp->ch[7].op[0]);
 		/* SD */
 		sndp->ch[7].op[1].input = 0;
-		sndp->ch[7].op[1].lvl = 2;
+		sndp->ch[7].op[1].lvl = 4;
+		OpUpdateEG(sndp, &sndp->ch[7], &sndp->ch[7].op[1]);
 		/* TOM */
 		sndp->ch[8].op[0].modcar = 0;
-		sndp->ch[8].op[0].lvl = 2;
+		sndp->ch[8].op[0].lvl = 4;
 		OpUpdateEG(sndp, &sndp->ch[8], &sndp->ch[8].op[0]);
-		/* HH */
-		sndp->ch[8].op[1].input = 0;
-		sndp->ch[8].op[1].lvl = 1;
+		/* CYM */
+		sndp->ch[8].op[1].modcar = 0;
+		sndp->ch[8].op[1].lvl = 2;
+		OpUpdateEG(sndp, &sndp->ch[8], &sndp->ch[8].op[1]);
 	}
 	else
 	{
@@ -823,19 +1133,25 @@ static void __fastcall oplsetrc(OPLSOUND *sndp, Uint32 rc)
 			SetChTone(sndp, &sndp->ch[7], &romtone[0][0x11 << 4], volini);
 			SetChTone(sndp, &sndp->ch[8], &romtone[0][0x12 << 4], volini);
 #endif
-			sndp->ch[7].op[0].nst = PG_SHIFT + 4;
-			sndp->ch[7].op[1].nst = PG_SHIFT + 6;
-			sndp->ch[8].op[1].nst = PG_SHIFT + 5;
+//			sndp->ch[7].op[0].nst = PG_SHIFT + 4;
+//			sndp->ch[7].op[1].nst = PG_SHIFT + 6;
+//			sndp->ch[8].op[1].nst = PG_SHIFT + 5;
+
+			sndp->ch[7].op[0].nst = DP_BITS;
+			sndp->ch[7].op[1].nst = DP_BITS;
+			sndp->ch[8].op[1].nst = DP_BITS;
 		}
 		initrc_common(sndp, rc & 0x20);
 	}
 	sndp->common.rmode = rc & 0x20;
 	sndp->common.rc = rc & 0x1f;
+
+	
 	/* BD */
 	sndp->ch[6].op[0].rkey = sndp->ch[6].op[1].rkey = rc & 0x10;
 	oplsetopkey(sndp, &sndp->ch[6].op[0]);
 	oplsetopkey(sndp, &sndp->ch[6].op[1]);
-	/* CYM */
+	/* HH */
 	sndp->ch[7].op[0].rkey = rc & 0x01;
 	oplsetopkey(sndp, &sndp->ch[7].op[0]);
 	/* SD */
@@ -844,7 +1160,7 @@ static void __fastcall oplsetrc(OPLSOUND *sndp, Uint32 rc)
 	/* TOM */
 	sndp->ch[8].op[0].rkey = rc & 0x04;
 	oplsetopkey(sndp, &sndp->ch[8].op[0]);
-	/* HH */
+	/* CYM */
 	sndp->ch[8].op[1].rkey = rc & 0x02;
 	oplsetopkey(sndp, &sndp->ch[8].op[1]);
 }
@@ -859,11 +1175,14 @@ static void __fastcall opllsetrc(OPLSOUND *sndp, Uint32 rc)
 			opllsetchtone(sndp, &sndp->ch[6], 0x10);
 			opllsetchtone(sndp, &sndp->ch[7], 0x11);
 			opllsetchtone(sndp, &sndp->ch[8], 0x12);
+//			opllsetopvolume(sndp, &sndp->ch[6], &sndp->ch[6].op[1], (sndp->regs[0x36] & 0x0f) << 2);
 			opllsetopvolume(sndp, &sndp->ch[7], &sndp->ch[7].op[0], (sndp->regs[0x37] & 0xf0) >> 2);
+			opllsetopvolume(sndp, &sndp->ch[7], &sndp->ch[7].op[1], (sndp->regs[0x37] & 0x0f) << 2);
 			opllsetopvolume(sndp, &sndp->ch[8], &sndp->ch[8].op[0], (sndp->regs[0x38] & 0xf0) >> 2);
-			sndp->ch[7].op[0].nst = PG_SHIFT + 5;
-			sndp->ch[7].op[1].nst = PG_SHIFT + 5;
-			sndp->ch[8].op[1].nst = PG_SHIFT + 5;
+			opllsetopvolume(sndp, &sndp->ch[8], &sndp->ch[8].op[1], (sndp->regs[0x38] & 0x0f) << 2);
+			sndp->ch[7].op[0].nst = DP_BITS;
+			sndp->ch[7].op[1].nst = DP_BITS;
+			sndp->ch[8].op[1].nst = DP_BITS;
 		}
 		else
 		{
@@ -879,7 +1198,7 @@ static void __fastcall opllsetrc(OPLSOUND *sndp, Uint32 rc)
 	sndp->ch[6].op[0].rkey = sndp->ch[6].op[1].rkey = rc & 0x10;
 	oplsetopkey(sndp, &sndp->ch[6].op[0]);
 	oplsetopkey(sndp, &sndp->ch[6].op[1]);
-	/* CYM */
+	/* HH */
 	sndp->ch[7].op[0].rkey = rc & 0x01;
 	oplsetopkey(sndp, &sndp->ch[7].op[0]);
 	/* SD */
@@ -888,7 +1207,7 @@ static void __fastcall opllsetrc(OPLSOUND *sndp, Uint32 rc)
 	/* TOM */
 	sndp->ch[8].op[0].rkey = rc & 0x04;
 	oplsetopkey(sndp, &sndp->ch[8].op[0]);
-	/* HH */
+	/* CYM */
 	sndp->ch[8].op[1].rkey = rc & 0x02;
 	oplsetopkey(sndp, &sndp->ch[8].op[1]);
 }
@@ -900,7 +1219,6 @@ static void __fastcall opllsetrc(OPLSOUND *sndp, Uint32 rc)
 
 __inline static void oplwritereg(OPLSOUND *sndp, Uint32 a, Uint32 v)
 {
-    int f_update = 0;
 	switch (a >> 5)
 	{
 	default:
@@ -934,45 +1252,26 @@ __inline static void oplwritereg(OPLSOUND *sndp, Uint32 a, Uint32 v)
 	case 4: OPLSETOP(oplsetopslrr); break;
 	case 7: OPLSETOP(oplsetopwf); break;
 	case 5:
-		if ((a & 0x1f) == (0xbd & 0x1f))
+		if ((a & 0x3f) == (0x3d))
 			oplsetrc(sndp, v);
 		else if ((a & 0x1f) < 9)
-        {
-            f_update = 1;
 			oplsetchfreql(sndp, &sndp->ch[a & 0xf], v);
-		}
         else if ((a & 0xf) < 9)
-        {
-            f_update = 1;
             oplsetchfreqh(sndp, &sndp->ch[a & 0xf], v);
-        }
         break;
 	case 6:
 		if ((a & 0x1f) < 9) oplsetchfbcon(sndp, &sndp->ch[a & 0xf], v);
 		break;
 	}
-    if (f_update)
-    {
-        int ch = a & 0x0f;
-        OPL_CH *chp = &sndp->ch[ch];
-        int reg = (chp->freqh << 8) | (chp->freql);
-        if (reg)
-            chstate[ch].freq = 49719 * reg / (1<<(19-4));
-        else
-            chstate[ch].freq = 0;
-        
-        f_update = 0;
-
-    }
 }
 
 static void oplwrite(void *sp, Uint32 a, Uint32 v)
 {
 	OPLSOUND *sndp = sp;
-
 	if (a & 1)
 	{
 		sndp->regs[sndp->common.adr] = v;
+		sndp->oplregs[sndp->common.adr] = v;
 		oplwritereg(sndp, sndp->common.adr, v);
 	}
 	else
@@ -982,7 +1281,6 @@ static void oplwrite(void *sp, Uint32 a, Uint32 v)
 static Uint32 oplread(void *sp, Uint32 a)
 {
 	OPLSOUND *sndp = sp;
-
 	if (a & 1)
 		return sndp->regs[sndp->common.adr];
 	else
@@ -991,13 +1289,17 @@ static Uint32 oplread(void *sp, Uint32 a)
 
 __inline static void opllwritereg(OPLSOUND *sndp, Uint32 a, Uint32 v)
 {
-    int f_update = 0;
+	char b;
 	switch (a >> 3)
 	{
 		default:
 			NEVER_REACH
 		case 0:
 			sndp->regs[OPLL_INST_WORK + (a & 7)] = v;
+			for(b=(sndp->regs[0xe]&0x20)?5:8;b>=0;b--){
+				if(!(sndp->regs[0x30+b]&0xf0))
+					opllsetchtone(sndp, &sndp->ch[b], 0);
+			}
 			break;
 		case 1:
 			if (a == 0xe) opllsetrc(sndp, v & 0x3f);
@@ -1005,22 +1307,19 @@ __inline static void opllwritereg(OPLSOUND *sndp, Uint32 a, Uint32 v)
 		case 2:
 		case 3:
 			a &= 0xf;
-			if (a < 9) {
-                opllsetchfreql(sndp, &sndp->ch[a], v);
-                f_update = 1;
-            }
+			a %= 9;
+			if (a < 9) opllsetchfreql(sndp, &sndp->ch[a], v);
 			break;
 		case 4:
 		case 5:
 			a &= 0xf;
-			if (a < 9) {
-                opllsetchfreqh(sndp, &sndp->ch[a], v);
-                f_update = 1;
-            }
+			a %= 9;
+			if (a < 9) opllsetchfreqh(sndp, &sndp->ch[a], v);
 			break;
 		case 6:
 		case 7:
 			a &= 0xf;
+			a %= 9;
 			if (a < 9)
 			{
 				if ((sndp->common.rmode) && (a >= 6))
@@ -1035,36 +1334,17 @@ __inline static void opllwritereg(OPLSOUND *sndp, Uint32 a, Uint32 v)
 			}
 			break;
 	}
-    
-    if (f_update)
-    {
-        int ch = a & 0x0f;
-        
-        if (a < 9)
-        {
-            OPL_CH *chp = &sndp->ch[ch];
-            int reg = (chp->freqh << 8) | (chp->freql);
-            if (chp->op[0].key)
-            {
-                if (reg)
-                    chstate[ch].freq = (49719 * reg) / (1<<(19 - chp->blk));
-                else
-                    chstate[ch].freq = 0;
-            }
-        }
-        f_update = 0;
-    }
 }
 
 static void opllwrite(void *sp, Uint32 a, Uint32 v)
 {
 	OPLSOUND *sndp = sp;
-
 	if (a & 1)
 	{
 		if (sndp->common.adr < 0x40)
 		{
 			sndp->regs[sndp->common.adr] = v;
+			sndp->opllregs[sndp->common.adr] = v;
 			opllwritereg(sndp, sndp->common.adr, v);
 		}
 	}
@@ -1085,7 +1365,6 @@ static void __fastcall opreset(OPLSOUND *sndp, OPL_OP *opp)
 #if TESTING_OPTIMIZE_AME
 	opp->amin = &sndp->common.amzero;
 #endif
-	opp->pg.rng = 0xffff;
 }
 
 static void __fastcall chreset(OPLSOUND *sndp, OPL_CH *chp, Uint32 clock, Uint32 freq)
@@ -1102,8 +1381,14 @@ static void __fastcall chreset(OPLSOUND *sndp, OPL_CH *chp, Uint32 clock, Uint32
 static void sndreset(void *sp, Uint32 clock, Uint32 freq)
 {
 	OPLSOUND *sndp = sp;
-
 	Uint32 i, cpse;
+#if LOWPASS_FILTER
+	Uint32 loop;
+	double answer,plus,fb;
+#endif
+	sndp->freq = freq;
+	sndp->freqp = 0;
+//	freq = FM_FREQ;
 	XMEMSET(&sndp->common, 0, sizeof(sndp->common));
 	XMEMSET(&sndp->lfo[LFO_UNIT_AM], 0, sizeof(OPL_LFO));
 	sndp->lfo[LFO_UNIT_AM].sps = DivFix(37 * (1 << AMTBL_BITS), freq * 10, LFO_SHIFT);
@@ -1113,11 +1398,11 @@ static void sndreset(void *sp, Uint32 clock, Uint32 freq)
 	sndp->lfo[LFO_UNIT_PM].sps = DivFix(64 * (1 << PMTBL_BITS), freq * 10, LFO_SHIFT);
 	sndp->lfo[LFO_UNIT_PM].adrmask = (1 << PMTBL_BITS) - 1;
 	sndp->lfo[LFO_UNIT_PM].table = sndp->opltbl->pm_table1;
-	sndp->common.cpsp = DivFix(clock, 72 * freq, CPS_SHIFTP);
+	sndp->common.cpsp = DivFix(clock, 72 * freq/4, CPS_SHIFTP);
 	cpse = DivFix(clock, 72 * freq, CPS_SHIFTE);
 	for (i = 0; i < 4; i++)
 	{
-		sndp->common.ratetbl[i] = (i + 4) * cpse;
+		sndp->common.ratetbl[i] = (4+i) * cpse;
 		sndp->common.ratetbla[i] = 3 * sndp->common.ratetbl[i];
 	}
 	sndp->common.tll2logtbl = sndp->opltbl->tll2log_table;
@@ -1127,8 +1412,14 @@ static void sndreset(void *sp, Uint32 clock, Uint32 freq)
 	if (sndp->opl_type & OPL_TYPE_OPL)
 	{
 		XMEMSET(&sndp->regs, 0, 0x100);
+		/*
 		sndp->common.ar_table = sndp->opltbl->ar_tablepow;
 		sndp->common.sintablemask -= (1 << (SINTBL_BITS - 11)) - 1;
+		*/
+		sndp->common.ar_table = sndp->opltbl->ar_tablelog;
+		//sndp->common.wfe = 1;
+		//sndp->common.sintablemask -= (1 << (SINTBL_BITS - 8)) - 1;
+		
 		for (i = 0x0; i < 0x100; i++)
 		{
 			oplwrite(sndp, 0, i);
@@ -1168,12 +1459,19 @@ static void sndreset(void *sp, Uint32 clock, Uint32 freq)
 			opllwrite(sndp, 1, 0xb3);
 		}
 	}
+	for (i = 0; i < 9; i++)
+	{
+		sndp->ch[i].op[0].type = 0;
+		sndp->ch[i].op[1].type = 1;
+	}
+	sndp->rng = 0xffff;
+
+
 }
 
 static void oplsetinst(void *sp, Uint32 n, void *p, Uint32 l)
 {
 	OPLSOUND *sndp = sp;
-
 	if (sndp->deltatpcm) sndp->deltatpcm->setinst(sndp->deltatpcm->ctx, n, p, l);
 }
 
@@ -1187,7 +1485,6 @@ static void opllsetinst(void *sp, Uint32 n, void *vp, Uint32 l)
 {
 	OPLSOUND *sndp = sp;
 	Uint8 *p = vp;
-
 	Int32 i, j, sb = 9;
 	if (n) return;
 	if ((GetDwordLE(p) & 0xf0ffffff) == GetDwordLEM("ILL0"))
@@ -1212,41 +1509,42 @@ static void opllsetinst(void *sp, Uint32 n, void *vp, Uint32 l)
 	sndp->common.sintablemask -= (1 << (SINTBL_BITS - sb)) - 1;
 }
 
-
-static void setmask(void *p, int dev, char *mask)
-{
-    chmask = mask;
-}
-
-static void setchstate(void *p, int dev, S_STATE *state)
-{
-    chstate = state;
-}
-
 static void sndrelease(void *sp)
 {
 	OPLSOUND *sndp = sp;
-
+	if (sndp) {
 	if (sndp->logtbl) sndp->logtbl->release(sndp->logtbl->ctx);
 	if (sndp->opltbl) sndp->opltbl->release(sndp->opltbl->ctx);
 	if (sndp->deltatpcm) sndp->deltatpcm->release(sndp->deltatpcm->ctx);
 	XFREE(sndp);
 }
+}
+
+//ここからレジスタビュアー設定
+static Uint8 *regdata;
+static Uint8 *regdata2;
+Uint32 (*ioview_ioread_DEV_OPL)(Uint32 a);
+Uint32 (*ioview_ioread_DEV_OPLL)(Uint32 a);
+static Uint32 ioview_ioread_bf(Uint32 a){
+	if(a<=0xff)return regdata[a];else return 0x100;
+}
+static Uint32 ioview_ioread_bf2(Uint32 a){
+	if(a<0x40)return regdata2[a];else return 0x100;
+}
+//ここまでレジスタビュアー設定
 
 KMIF_SOUND_DEVICE *OPLSoundAlloc(Uint32 opl_type)
 {
 	OPLSOUND *sndp;
 	sndp = XMALLOC(sizeof(OPLSOUND));
 	if (!sndp) return 0;
-	sndp->opl_type = opl_type;
+	XMEMSET(sndp, 0, sizeof(OPLSOUND));
+	sndp->opl_type = (Uint8)opl_type;
 	sndp->kmif.ctx = sndp;
 	sndp->kmif.release = sndrelease;
 	sndp->kmif.volume = sndvolume;
 	sndp->kmif.reset = sndreset;
 	sndp->kmif.synth = sndsynth;
-	sndp->kmif.setmask = setmask;
-	sndp->kmif.setchstate = setchstate;
-    
 	if (sndp->opl_type == OPL_TYPE_MSXAUDIO)
 	{
 		sndp->deltatpcm = YMDELTATPCMSoundAlloc(YMDELTATPCM_TYPE_Y8950, 0);
@@ -1268,15 +1566,13 @@ KMIF_SOUND_DEVICE *OPLSoundAlloc(Uint32 opl_type)
 		{
 			case OPL_TYPE_OPLL:
 			case OPL_TYPE_MSXMUSIC:
-				opllsetinst(sndp, 0, romtone[0], 16 * 19);
-				break;
 			case OPL_TYPE_SMSFMUNIT:
-				opllsetinst(sndp, 0, romtone[1], 16 * 19);
+				opllsetinst(sndp, 0, romtone[0], 16 * 19);//YM2413
 				break;
 			case OPL_TYPE_VRC7:
-				opllsetinst(sndp, 0, romtone[2], 16 * 19);
+				opllsetinst(sndp, 0, romtone[2], 16 * 19);//VRC7
 				break;
-		}
+		}												  //romtone[1]を使う必要全然なし
 	}
 	sndp->logtbl = LogTableAddRef();
 	sndp->opltbl = OplTableAddRef();
@@ -1285,6 +1581,14 @@ KMIF_SOUND_DEVICE *OPLSoundAlloc(Uint32 opl_type)
 		sndrelease(sndp);
 		return 0;
 	}
-
+	//ここからレジスタビュアー設定
+	if (sndp->opl_type & OPL_TYPE_OPL){
+		regdata = sndp->oplregs;
+		ioview_ioread_DEV_OPL = ioview_ioread_bf;
+	}else{
+		regdata2 = sndp->opllregs;
+		ioview_ioread_DEV_OPLL = ioview_ioread_bf2;
+	}
+	//ここまでレジスタビュアー設定
 	return &sndp->kmif;
 }

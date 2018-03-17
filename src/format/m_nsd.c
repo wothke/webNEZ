@@ -269,6 +269,7 @@ Uint NSDLoad(Uint8 *pData, Uint uSize)
 	nsdplayer = (NSDSEQ *)XMALLOC(sizeof(NSDSEQ));
 	if (!nsdplayer) {
 		free(nsfnsf);
+		nsfnsf= 0;
 		return NESERR_SHORTOFMEMORY;
 	}
 	NSFNSF *nsf= nsfnsf;

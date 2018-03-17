@@ -5,8 +5,6 @@
 extern "C" {
 #endif
 
-void FME7SetState(S_STATE *state);
-void FME7SetMask(char *mask);
 void FME7SoundInstall(void);
 
 #ifdef __cplusplus

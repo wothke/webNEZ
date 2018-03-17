@@ -4,7 +4,7 @@
 * Copyright (C) 2018 Juergen Wothke
 *
 *
-* Credits:   NEZplug(++) by Mamiya
+* Credits:   NEZplug++ by Mamiya (and nezplay by BouKiCHi)
 * 
 *
 * LICENSE
@@ -30,11 +30,9 @@
 	.kss (KSSX, KSCC, ) https://www.zophar.net/music/kss
 	.hes (HESM) https://ftp.modland.com/pub/modules/HES/
 	.nsf (NESM) https://ftp.modland.com/pub/modules/Nintendo%20Sound%20Format/ 
-	.ay (ZXAY) https://zxart.ee/eng/music/
+	.ay, cpc.emul (ZXAY) https://zxart.ee/eng/music/ , https://ftp.modland.com/pub/modules/AY%20Emul/
 	.gbr(GBRF, GBS) https://ftp.modland.com/pub/modules/Gameboy%20Sound%20System%20GBR/
 	(NESL)
-	
-	
 	
 */
 
@@ -59,6 +57,13 @@
 
 extern "C" Uint NEZLoad(Uint8 *pData, Uint uSize);
 
+Uint8 chmask[0x80]={
+1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+};
+
 
 std::string trim(const std::string& str) {
     size_t first = str.find_first_not_of(' ');
@@ -79,7 +84,6 @@ int16_t sample_buffer[SAMPLE_BUF_SIZE * CHANNELS];
 int samples_available= 0;
 
 char* info_texts[4];
-
 
 #define TEXT_MAX	255
 char title_str[TEXT_MAX];
@@ -220,8 +224,7 @@ extern "C" long EMSCRIPTEN_KEEPALIVE emu_get_audio_buffer_length(void) {
 
 extern "C" int emu_compute_audio_samples() __attribute__((noinline));
 extern "C" int EMSCRIPTEN_KEEPALIVE emu_compute_audio_samples() {
-    NESAudioRender( sample_buffer, SAMPLE_BUF_SIZE );
-	
+	NESAudioRender( sample_buffer, SAMPLE_BUF_SIZE );
 	samples_available= SAMPLE_BUF_SIZE;
 	
 	return 0;

@@ -5,11 +5,9 @@
 extern "C" {
 #endif
 
-void MMC5SetState(S_STATE *state);
-void MMC5SetMask(char *mask);
-void MMC5MutiplierInstall(void);
-void MMC5SoundInstall(void);
-void MMC5ExtendRamInstall(void);
+void MMC5MutiplierInstall();
+void MMC5SoundInstall();
+void MMC5ExtendRamInstall();
 
 #ifdef __cplusplus
 }

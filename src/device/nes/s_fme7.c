@@ -1,18 +1,18 @@
 #include "nestypes.h"
+#include "kmsnddev.h"
 #include "format/audiosys.h"
 #include "format/handler.h"
 #include "format/nsf6502.h"
-#include "nsdout.h"
+
 #include "logtable.h"
 #include "s_fme7.h"
 #include "s_psg.h"
-
-#define NES_SOUND_TAG "FME7"
 
 #define BASECYCLES_ZX  (3579545)/*(1773400)*/
 #define BASECYCLES_AMSTRAD  (2000000)
 #define BASECYCLES_MSX (3579545)
 #define BASECYCLES_NES (21477270)
+#define FME7_VOL 4/5
 
 typedef struct {
 	KMIF_SOUND_DEVICE *psgp;
@@ -20,32 +20,25 @@ typedef struct {
 } PSGSOUND;
 
 
-
-static void __fastcall PSGSoundVolume(Uint volume);
-
-static NES_VOLUME_HANDLER s_psg_volume_handler[] = {
-	{ PSGSoundVolume, NES_SOUND_TAG, },
-	{ 0, 0, },
-};
-
 static PSGSOUND psgs = { 0, 0 };
 
 static Int32 __fastcall PSGSoundRender(void)
 {
 	Int32 b[2] = {0, 0};
 	psgs.psgp->synth(psgs.psgp->ctx, b);
-	return VOLGAIN(b[0], s_psg_volume_handler[0]);
-}
+	return b[0]*FME7_VOL;}
 
 static void __fastcall PSGSoundRender2(Int32 *d)
 {
 	Int32 b[2] = {0, 0};
 	psgs.psgp->synth(psgs.psgp->ctx, b);
-	VOLGAIN2(d, b, s_psg_volume_handler[0]);
+	d[0] += b[0]*FME7_VOL;
+	d[1] += b[0]*FME7_VOL;
 }
 
 static NES_AUDIO_HANDLER s_psg_audio_handler[] = {
-	{ 3, PSGSoundRender, PSGSoundRender2, }, 
+	{ 1, PSGSoundRender}, 
+//	{ 3, PSGSoundRender, PSGSoundRender2, }, 
 	{ 0, 0, 0, }, 
 };
 
@@ -54,6 +47,10 @@ static void __fastcall PSGSoundVolume(Uint volume)
 	psgs.psgp->volume(psgs.psgp->ctx, volume);
 }
 
+static NES_VOLUME_HANDLER s_psg_volume_handler[] = {
+	{ PSGSoundVolume, }, 
+	{ 0, }, 
+};
 
 static Uint __fastcall PSGSoundReadData(Uint address)
 {
@@ -62,16 +59,11 @@ static Uint __fastcall PSGSoundReadData(Uint address)
 
 static void __fastcall PSGSoundWrireAddr(Uint address, Uint value)
 {
-	WRITE_LOG();
-
-	psgs.adr = value;
+	psgs.adr = (Uint8)value;
 	psgs.psgp->write(psgs.psgp->ctx, 0, value);
 }
 static void __fastcall PSGSoundWrireData(Uint address, Uint value)
 {
-	WRITE_LOG();
-
-	if (NSD_out_mode) NSDWrite(NSD_FME7, psgs.adr, value);
 	psgs.psgp->write(psgs.psgp->ctx, 1, value);
 }
 
@@ -105,20 +97,6 @@ static NES_TERMINATE_HANDLER s_psg_terminate_handler[] = {
 	{ PSGSoundTerm, }, 
 	{ 0, }, 
 };
-
-void FME7SetMask(char *mask)
-{
-    if (psgs.psgp)
-        psgs.psgp->setmask(psgs.psgp->ctx, 0, mask);
-}
-
-
-void FME7SetState(S_STATE *state)
-{
-    if (psgs.psgp)
-        psgs.psgp->setchstate(psgs.psgp->ctx, 0, state);
-}
-
 
 void FME7SoundInstall(void)
 {

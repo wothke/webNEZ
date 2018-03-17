@@ -1105,8 +1105,8 @@ static void __fastcall GBRDMGVolume(Uint32 v)
 }
 
 static NES_VOLUME_HANDLER gbrdmg_volume_handler[] = {
-	{ GBRDMGVolume, "DMG" },
-	{ 0,0 },
+	{ GBRDMGVolume, }, 
+	{ 0, }, 
 };
 
 static void __fastcall GBRDMGCPUReset(void)

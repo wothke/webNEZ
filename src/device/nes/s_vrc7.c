@@ -1,26 +1,24 @@
 #include "nestypes.h"
+#include "kmsnddev.h"
 #include "format/audiosys.h"
 #include "format/handler.h"
 #include "format/nsf6502.h"
-#include "nsdout.h"
 #include "logtable.h"
+#include "m_nsf.h"
 #include "s_vrc7.h"
 
-#define NES_SOUND_TAG "VRC7"
-
 #define MASTER_CLOCK        (3579545)
+#define VRC7_VOL 4/3
 
 #include "opl/s_opl.h"
 
-static void __fastcall OPLLSoundVolume(Uint32 volume);
 
-static NES_VOLUME_HANDLER s_opll_volume_handler[] = {
-	{ OPLLSoundVolume,NES_SOUND_TAG, },
-	{ 0,0, },
-};
-
+typedef struct {
+	KMIF_SOUND_DEVICE *kmif;
+} OPLLSOUND_INTF;
 static Uint8 usertone_enable[1] = { 0 };
 static Uint8 usertone[1][16 * 19];
+static OPLLSOUND_INTF sndp;
 
 static Uint32 GetDwordLE(Uint8 *p)
 {
@@ -28,6 +26,14 @@ static Uint32 GetDwordLE(Uint8 *p)
 }
 #define GetDwordLEM(p) (Uint32)((((Uint8 *)p)[0] | (((Uint8 *)p)[1] << 8) | (((Uint8 *)p)[2] << 16) | (((Uint8 *)p)[3] << 24)))
 
+void OPLLSetTone(Uint8 *p, Uint32 type)
+{
+	if ((GetDwordLE(p) & 0xf0ffffff) == GetDwordLEM("ILL0"))
+		XMEMCPY(usertone[type], p, 16 * 19);
+	else
+		XMEMCPY(usertone[type], p, 8 * 15);
+	usertone_enable[type] = 1;
+}
 void VRC7SetTone(Uint8 *p, Uint type)
 {
 	extern void OPLLSetTone(Uint8 *p, Uint32 type);
@@ -49,40 +55,22 @@ void VRC7SetTone(Uint8 *p, Uint type)
 	}
 }
 
-typedef struct {
-	KMIF_SOUND_DEVICE *kmif;
-} OPLLSOUND_INTF;
-
-static OPLLSOUND_INTF sndp = { 0 } ;
-
-
-void VRC7SetMask(char *mask)
-{
-    sndp.kmif->setmask(sndp.kmif->ctx, 0, mask);
-}
-
-void VRC7SetState(S_STATE *state)
-{
-    sndp.kmif->setchstate(sndp.kmif->ctx, 0, state);
-}
-
 static Int32 __fastcall OPLLSoundRender(void)
 {
 	Int32 b[2] = {0, 0};
 	sndp.kmif->synth(sndp.kmif->ctx, b);
-	return VOLGAIN(b[0], s_opll_volume_handler[0]);
+	return b[0]*VRC7_VOL;
 }
 
 static void __fastcall OPLLSoundRender2(Int32 *d)
 {
-	Int32 b[2] = {0, 0};
-	sndp.kmif->synth(sndp.kmif->ctx, b);	
-	VOLGAIN2(d, b, s_opll_volume_handler[0]);
+	sndp.kmif->synth(sndp.kmif->ctx, d);
 }
 
 
-static NES_AUDIO_HANDLER s_opll_audio_handler[] = {
-	{ 3, OPLLSoundRender, OPLLSoundRender2, }, 
+const static NES_AUDIO_HANDLER s_opll_audio_handler[] = {
+	{ 1, OPLLSoundRender}, 
+//	{ 3, OPLLSoundRender, OPLLSoundRender2, }, 
 	{ 0, 0, 0, }, 
 };
 
@@ -91,6 +79,10 @@ static void __fastcall OPLLSoundVolume(Uint32 volume)
 	sndp.kmif->volume(sndp.kmif->ctx, volume);
 }
 
+const static NES_VOLUME_HANDLER s_opll_volume_handler[] = {
+	{ OPLLSoundVolume, },
+	{ 0, }, 
+};
 static void __fastcall VRC7SoundReset(void)
 {
 	if (usertone_enable[0]) sndp.kmif->setinst(sndp.kmif->ctx, 0, usertone[0], 16 * 19);
@@ -118,15 +110,11 @@ static NES_TERMINATE_HANDLER s_opll_terminate_handler[] = {
 
 static void __fastcall OPLLSoundWriteAddr(Uint32 address, Uint32 value)
 {
-	WRITE_LOG();
-
 	sndp.kmif->write(sndp.kmif->ctx, 0, value);
 }
 
 static void __fastcall OPLLSoundWriteData(Uint32 address, Uint32 value)
 {
-	WRITE_LOG();
-
 	sndp.kmif->write(sndp.kmif->ctx, 1, value);
 }
 
@@ -146,6 +134,8 @@ static NES_WRITE_HANDLER s_vrc7_write_handler[] =
 
 void VRC7SoundInstall(void)
 {
+	XMEMSET(&sndp, 0, sizeof(OPLLSOUND_INTF));
+	usertone_enable[0] = 0;
 	LogTableInitialize();
 	sndp.kmif = OPLSoundAlloc(OPL_TYPE_VRC7);
 	if (sndp.kmif)

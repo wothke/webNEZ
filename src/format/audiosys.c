@@ -6,6 +6,9 @@
 
 #define SHIFT_BITS 8
 
+Int32 output2[2],filter;
+int LowPassFilterLevel=8,lowlevel;
+
 static Uint frequency = 44100;
 static Uint channel = 1;
 
@@ -58,6 +61,8 @@ void NESAudioFilterSet(Uint filter)
 	naf_type = filter;
 	naf_prev[0] = 0x8000;
 	naf_prev[1] = 0x8000;
+	output2[0] = 0x7fffffff;
+	output2[1] = 0x7fffffff;
 }
 
 void NESAudioRender(Int16 *bufp, Uint buflen)
@@ -91,24 +96,59 @@ void NESAudioRender(Int16 *bufp, Uint buflen)
 			for (ch = 0; ch < maxch; ch++)
 			{
 				Uint32 output[2];
-				accum[ch] += (0x8000 << SHIFT_BITS);
+				accum[ch] += (0x10000 << SHIFT_BITS);
 				if (accum[ch] < 0)
 					output[ch] = 0;
-				else if (accum[ch] > (0x10000 << SHIFT_BITS) - 1)
-					output[ch] = (0x10000 << SHIFT_BITS) - 1;
+				else if (accum[ch] > (0x20000 << SHIFT_BITS) - 1)
+					output[ch] = (0x20000 << SHIFT_BITS) - 1;
 				else
 					output[ch] = accum[ch];
 				output[ch] >>= SHIFT_BITS;
-				switch (naf_type)
+
+//DCオフセットフィルタ
+				if(!(naf_type&4)){
+					Int32 buffer;
+					if (output2[ch] == 0x7fffffff){
+						output2[ch] = ((Int32)output[ch]<<14) - 0x40000000;
+						//output2[ch] *= -1;
+					}
+					output2[ch] -= (output2[ch] - (((Int32)output[ch]<<14) - 0x40000000))/(64*filter);
+					buffer =  output[ch]/2 - output2[ch]/0x8000;
+
+					if (buffer < 0)
+						output[ch] = 0;
+					else if (buffer > 0xffff)
+						output[ch] = 0xffff;
+					else
+						output[ch] = buffer;
+				}else{
+					output[ch] >>= 1;
+				}
+
+				switch (naf_type&3)
 				{
 					case NES_AUDIO_FILTER_LOWPASS:
 						{
 							Uint32 prev = naf_prev[ch];
+							//output[ch] = (output[ch] + prev) >> 1;
+							output[ch] = (output[ch] * lowlevel + prev * filter) / (lowlevel+filter);
 							naf_prev[ch] = output[ch];
-							output[ch] = (output[ch] + prev) >> 1;
 						}
 						break;
 					case NES_AUDIO_FILTER_WEIGHTED:
+						{
+							Uint32 prev = naf_prev[ch];
+							naf_prev[ch] = output[ch];
+							output[ch] = (output[ch] + output[ch] + output[ch] + prev) >> 2;
+						}
+						break;
+					case NES_AUDIO_FILTER_LOWPASS_WEIGHTED:
+						{
+							Uint32 prev = naf_prev[ch];
+							//output[ch] = (output[ch] + prev) >> 1;
+							output[ch] = (output[ch] * lowlevel + prev * filter) / (lowlevel+filter);
+							naf_prev[ch] = output[ch];
+						}
 						{
 							Uint32 prev = naf_prev[ch];
 							naf_prev[ch] = output[ch];
@@ -267,6 +307,15 @@ int NESGetAvgCycle(void)
     return -1;
 }
 
+
+void NESAudioFrequencySet(Uint freq)
+{
+	frequency = freq;
+
+	filter = freq/3000;
+	if(!filter)filter=1;
+	lowlevel = 33-LowPassFilterLevel;
+}
 int NESGetMaxCycle(void)
 {
     if (nes_funcs.max)
@@ -322,10 +371,7 @@ void NESAudioHandlerInitialize(void)
 	nvh = 0;
 }
 
-void NESAudioFrequencySet(Uint freq)
-{
-	frequency = freq;
-}
+
 Uint NESAudioFrequencyGet(void)
 {
 	return frequency;

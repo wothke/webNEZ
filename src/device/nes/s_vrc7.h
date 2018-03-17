@@ -7,12 +7,8 @@
 extern "C" {
 #endif
 
-#define USE_FMOPL 0
-
-void VRC7SetState(S_STATE *state);
-void VRC7SetMask(char *mask);
-void VRC7SoundInstall(void);
-void VRC7SetTone(Uint8 *p, Uint type);
+void VRC7SoundInstall();
+void VRC7SetTone( Uint8 *p, Uint type);
 
 #ifdef __cplusplus
 }

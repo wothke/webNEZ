@@ -702,7 +702,7 @@ RAM Bank      (8000-BFFF): %d\r\n\
 
 		break;
 	case SYNTHMODE_CV:
-		THIS_->sndp[SND_SNG] = SNGSoundAlloc(SNG_TYPE_SN76496);	// was SNG_TYPE_SN76489AN.. XXXX FIX when merge complete!
+		THIS_->sndp[SND_SNG] = SNGSoundAlloc(SNG_TYPE_SN76489AN);
 		SONGINFO_SetChannel(1);
 		//Ç±Ç±Ç©ÇÁÉ_ÉìÉvê›íË
 		dump_DEV_SN76489 = dump_DEV_SN76489_bf;
@@ -763,8 +763,8 @@ static void __fastcall SGCSEQVolume( Uint32 v)
 }
 
 static NES_VOLUME_HANDLER sgcseq_volume_handler[] = {
-	{ SGCSEQVolume, "SGCSEQ"}, 
-	{ 0,0 }, 
+	{ SGCSEQVolume, }, 
+	{ 0, }, 
 };
 
 static void __fastcall SGCSEQReset(void)

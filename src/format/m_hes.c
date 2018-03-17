@@ -765,7 +765,7 @@ static void __fastcall HESHESTerminate()
 {
 	if (heshes)
 	{
-		terminate();
+		terminate(heshes);
 	}
 }
 
@@ -784,7 +784,7 @@ Uint32 HESLoad(Uint8 *pData, Uint32 uSize)
 	ret = load(THIS_, pData, uSize);
 	if (ret)
 	{
-		terminate();
+		terminate(THIS_);
 		return ret;
 	}
 	heshes = THIS_;

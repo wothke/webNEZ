@@ -19,8 +19,9 @@ if not exist "built/cpu.bc" (
 	call emcc.bat  %OPT% ../src/cpu/kmz80/kmz80t.c ../src/cpu/kmz80/kmz80c.c ../src/cpu/kmz80/kmz80.c ../src/cpu/kmz80/kmevent.c ../src/cpu/kmz80/kmdmg.c -o built/cpu.bc
 	IF !ERRORLEVEL! NEQ 0 goto :END
 )
+::../src/device/nes/nsdout.c
 if not exist "built/device.bc" (
-	call emcc.bat   %OPT%   ../src/device/opl/s_deltat.c ../src/device/opl/s_opltbl.c ../src/device/opl/s_opl.c ../src/device/nes/nsdout.c ../src/device/nes/s_vrc7.c ../src/device/nes/s_vrc6.c ../src/device/s_sng.c ../src/device/s_scc.c ../src/device/s_psg.c ../src/device/nes/s_n106.c ../src/device/nes/s_mmc5.c ../src/device/s_logtbl.c ../src/device/s_hesad.c ../src/device/s_hes.c ../src/device/nes/s_fme7.c ../src/device/nes/s_fds3.c ../src/device/nes/s_fds2.c ../src/device/nes/s_fds1.c ../src/device/nes/s_fds.c ../src/device/s_dmg.c ../src/device/nes/s_apu.c ../src/device/nes/logtable.c -o built/device.bc
+	call emcc.bat   %OPT%   ../src/device/opl/s_deltat.c ../src/device/opl/s_opltbl.c ../src/device/opl/s_opl.c  ../src/device/nes/s_vrc7.c ../src/device/nes/s_vrc6.c ../src/device/s_sng.c ../src/device/s_scc.c ../src/device/s_psg.c ../src/device/nes/s_n106.c ../src/device/nes/s_mmc5.c ../src/device/s_logtbl.c ../src/device/s_hesad.c ../src/device/s_hes.c ../src/device/nes/s_fme7.c ../src/device/nes/s_fds3.c ../src/device/nes/s_fds2.c ../src/device/nes/s_fds1.c ../src/device/nes/s_fds.c ../src/device/s_dmg.c ../src/device/nes/s_apu.c ../src/device/nes/logtable.c -o built/device.bc
 	IF !ERRORLEVEL! NEQ 0 goto :END
 )
 if not exist "built/format.bc" (

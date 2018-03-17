@@ -99,15 +99,6 @@ void kmevent_settimer(KMEVENT *kme, KMEVENT_ITEM_ID curid, Uint32 time)
 	if (kme->item[curid].count) kmevent_iteminsert(kme, curid);	/* ソート */
 }
 
-// タイマーを厳密なタイミングでセットする
-void kmevent_updatetimer(KMEVENT *kme, KMEVENT_ITEM_ID curid, Uint32 time)
-{
-	kmevent_itemunlist(kme, curid);	/* 取り外し */
-	kme->item[curid].count = time;
-	if (kme->item[curid].count) kmevent_iteminsert(kme, curid);	/* ソート */
-}
-
-
 Uint32 kmevent_gettimer(KMEVENT *kme, KMEVENT_ITEM_ID curid, Uint32 *time)
 {
 	Uint32 nextcount;

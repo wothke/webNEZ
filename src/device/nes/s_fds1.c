@@ -1,12 +1,10 @@
 #include "nestypes.h"
+#include "kmsnddev.h"
 #include "format/audiosys.h"
 #include "format/handler.h"
 #include "format/nsf6502.h"
-#include "nsdout.h"
 #include "logtable.h"
 #include "s_fds.h"
-
-#define NES_SOUND_TAG "FDS"
 
 #define NES_BASECYCLES (21477270)
 #define CPS_SHIFT (23)
@@ -46,15 +44,8 @@ typedef struct FDSSOUND {
 	Uint8 reg[0x10];
 } FDSSOUND;
 
-
-static void __fastcall FDSSoundVolume(Uint volume);
-
-static NES_VOLUME_HANDLER s_fds_volume_handler[] = {
-	{ FDSSoundVolume, NES_SOUND_TAG, },
-	{ 0, 0, },
-};
-
 static FDSSOUND fdssound;
+
 
 static Int32 __fastcall FDSSoundRender(void)
 {
@@ -83,11 +74,9 @@ static Int32 __fastcall FDSSoundRender(void)
 		if (vol)
 		{
 			vol += pop->sweep;
-			/* if (vol < 0)
+			if (vol < 0)
 				vol = 0;
-			else 
-			*/
-			if (vol > 0x3f)
+			else if (vol > 0x3f)
 				vol = 0x3f;
 		}
 		pop->envout = LinearToLog(vol);
@@ -111,7 +100,7 @@ static Int32 __fastcall FDSSoundRender(void)
 		}
 	}
 	if (fdssound.mute) return 0;
-	return VOLGAIN(fdssound.output, s_fds_volume_handler[0]);
+	return fdssound.output;
 }
 
 static NES_AUDIO_HANDLER s_fds_audio_handler[] =
@@ -125,14 +114,16 @@ static void __fastcall FDSSoundVolume(Uint volume)
 	fdssound.mastervolume = (volume << (LOG_BITS - 8)) << 1;
 }
 
+const static NES_VOLUME_HANDLER s_fds_volume_handler[] = {
+	{ FDSSoundVolume, }, 
+	{ 0, }, 
+};
 
 static void __fastcall FDSSoundWrite(Uint address, Uint value)
 {
-	WRITE_LOG();
 
 	if (0x4040 <= address && address <= 0x407F)
 	{
-		if (NSD_out_mode) NSDWrite(NSD_FDS, address, value);
 		fdssound.op[1].wave[address - 0x4040] = LinearToLog(((Int32)value & 0x3f) - 0x20);
 		/* fdssound.op[1].wave[address - 0x4040] = LinearToLog(((Int32)value & 0x7f) - 0x40); */
 	}
@@ -140,8 +131,7 @@ static void __fastcall FDSSoundWrite(Uint address, Uint value)
 	{
 		int ch = (address < 0x4084);
 		FDS_FMOP *pop = &fdssound.op[ch];
-		if (NSD_out_mode) NSDWrite(NSD_FDS, address, value);
-		fdssound.reg[address - 0x4080] = value;
+		fdssound.reg[address - 0x4080] = (Uint8)value;
 		switch (address & 15)
 		{
 			case 0:	case 4:
@@ -153,7 +143,7 @@ static void __fastcall FDSSoundWrite(Uint address, Uint value)
 				else
 				{
 					pop->envspd = ((value & 0x3f) + 1) << CPS_SHIFT;
-					pop->envmode = 0x80 | value;
+					pop->envmode = (Uint8)(0x80 | value);
 				}
 				break;
 			case 1:	case 5:
@@ -257,12 +247,23 @@ static NES_RESET_HANDLER s_fds_reset_handler[] =
 	{ 0,                   0, }, 
 };
 
+static void __fastcall FDSSoundTerm(void)
+{
+}
+
+const static NES_TERMINATE_HANDLER s_fds_terminate_handler[] = {
+	{ FDSSoundTerm, }, 
+	{ 0, }, 
+};
+
 void FDSSoundInstall1(void)
 {
+	XMEMSET(&fdssound, 0, sizeof(FDSSOUND));
 	LogTableInitialize();
 	NESAudioHandlerInstall(s_fds_audio_handler);
 	NESVolumeHandlerInstall(s_fds_volume_handler);
 	NESReadHandlerInstall(s_fds_read_handler);
 	NESWriteHandlerInstall(s_fds_write_handler);
+	NESResetHandlerInstall(s_fds_reset_handler);
 	NESResetHandlerInstall(s_fds_reset_handler);
 }

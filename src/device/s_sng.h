@@ -8,9 +8,9 @@ extern "C" {
 #endif
 
 enum {
-	SNG_TYPE_SN76496,	/* TI SN76496 (TI TMS9919 VDP) */
+	SNG_TYPE_SN76489AN,	/* TI SN76489AN */
 	SNG_TYPE_SEGAMKIII,	/* SEGA custom VDP (Mono)      */
-	SNG_TYPE_GAMEGEAR	/* SEGA custom VDP */
+	SNG_TYPE_GAMEGEAR	/* SEGA custom VDP (Stereo)    */
 };
 
 KMIF_SOUND_DEVICE *SNGSoundAlloc(Uint32 sng_type);

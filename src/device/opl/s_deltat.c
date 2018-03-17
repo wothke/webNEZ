@@ -17,12 +17,12 @@ typedef struct {
 		Uint32 cps;
 		Uint32 phase;
 		Uint32 deltan;
-		Uint32 scale;
+		Int32 scale;
 		Uint32 mem;
 		Uint32 play;
 		Uint32 start;
 		Uint32 stop;
-		Int32 level32;
+		Uint32 level32;
 		Uint8 key;
 		Uint8 level;
 		Uint8 granuality;
@@ -40,9 +40,10 @@ typedef struct {
 	Uint32 ram_size;
 } YMDELTATPCMSOUND;
 
-const static Uint8 table_step[8] =
+const static Int8 table_step[16] =
 {
 	  1,   3,   5,   7,   9,  11,  13,  15,
+	-1,	-1,	-1,	-1,	2,	4,	6,	8
 };
 const static Uint8 table_scale[16] =
 {
@@ -50,11 +51,63 @@ const static Uint8 table_scale[16] =
 	 57,  57,  57,  57,  77, 102, 128, 153,
 };
 
+const static Int32 scaletable[49*16]={
+    2,    6,   10,   14,   18,   22,   26,   30,   -2,   -6,  -10,  -14,  -18,  -22,  -26,  -30,
+    2,    6,   10,   14,   19,   23,   27,   31,   -2,   -6,  -10,  -14,  -19,  -23,  -27,  -31,
+    2,    6,   11,   15,   21,   25,   30,   34,   -2,   -6,  -11,  -15,  -21,  -25,  -30,  -34,
+    2,    7,   12,   17,   23,   28,   33,   38,   -2,   -7,  -12,  -17,  -23,  -28,  -33,  -38,
+    2,    7,   13,   18,   25,   30,   36,   41,   -2,   -7,  -13,  -18,  -25,  -30,  -36,  -41,
+    3,    9,   15,   21,   28,   34,   40,   46,   -3,   -9,  -15,  -21,  -28,  -34,  -40,  -46,
+    3,   10,   17,   24,   31,   38,   45,   52,   -3,  -10,  -17,  -24,  -31,  -38,  -45,  -52,
+    3,   10,   18,   25,   34,   41,   49,   56,   -3,  -10,  -18,  -25,  -34,  -41,  -49,  -56,
+    4,   12,   21,   29,   38,   46,   55,   63,   -4,  -12,  -21,  -29,  -38,  -46,  -55,  -63,
+    4,   13,   22,   31,   41,   50,   59,   68,   -4,  -13,  -22,  -31,  -41,  -50,  -59,  -68,
+    5,   15,   25,   35,   46,   56,   66,   76,   -5,  -15,  -25,  -35,  -46,  -56,  -66,  -76,
+    5,   16,   27,   38,   50,   61,   72,   83,   -5,  -16,  -27,  -38,  -50,  -61,  -72,  -83,
+    6,   18,   31,   43,   56,   68,   81,   93,   -6,  -18,  -31,  -43,  -56,  -68,  -81,  -93,
+    6,   19,   33,   46,   61,   74,   88,  101,   -6,  -19,  -33,  -46,  -61,  -74,  -88, -101,
+    7,   22,   37,   52,   67,   82,   97,  112,   -7,  -22,  -37,  -52,  -67,  -82,  -97, -112,
+    8,   24,   41,   57,   74,   90,  107,  123,   -8,  -24,  -41,  -57,  -74,  -90, -107, -123,
+    9,   27,   45,   63,   82,  100,  118,  136,   -9,  -27,  -45,  -63,  -82, -100, -118, -136,
+   10,   30,   50,   70,   90,  110,  130,  150,  -10,  -30,  -50,  -70,  -90, -110, -130, -150,
+   11,   33,   55,   77,   99,  121,  143,  165,  -11,  -33,  -55,  -77,  -99, -121, -143, -165,
+   12,   36,   60,   84,  109,  133,  157,  181,  -12,  -36,  -60,  -84, -109, -133, -157, -181,
+   13,   39,   66,   92,  120,  146,  173,  199,  -13,  -39,  -66,  -92, -120, -146, -173, -199,
+   14,   43,   73,  102,  132,  161,  191,  220,  -14,  -43,  -73, -102, -132, -161, -191, -220,
+   16,   48,   81,  113,  146,  178,  211,  243,  -16,  -48,  -81, -113, -146, -178, -211, -243,
+   17,   52,   88,  123,  160,  195,  231,  266,  -17,  -52,  -88, -123, -160, -195, -231, -266,
+   19,   58,   97,  136,  176,  215,  254,  293,  -19,  -58,  -97, -136, -176, -215, -254, -293,
+   21,   64,  107,  150,  194,  237,  280,  323,  -21,  -64, -107, -150, -194, -237, -280, -323,
+   23,   70,  118,  165,  213,  260,  308,  355,  -23,  -70, -118, -165, -213, -260, -308, -355,
+   26,   78,  130,  182,  235,  287,  339,  391,  -26,  -78, -130, -182, -235, -287, -339, -391,
+   28,   85,  143,  200,  258,  315,  373,  430,  -28,  -85, -143, -200, -258, -315, -373, -430,
+   31,   94,  157,  220,  284,  347,  410,  473,  -31,  -94, -157, -220, -284, -347, -410, -473,
+   34,  103,  173,  242,  313,  382,  452,  521,  -34, -103, -173, -242, -313, -382, -452, -521,
+   38,  114,  191,  267,  345,  421,  498,  574,  -38, -114, -191, -267, -345, -421, -498, -574,
+   42,  126,  210,  294,  379,  463,  547,  631,  -42, -126, -210, -294, -379, -463, -547, -631,
+   46,  138,  231,  323,  417,  509,  602,  694,  -46, -138, -231, -323, -417, -509, -602, -694,
+   51,  153,  255,  357,  459,  561,  663,  765,  -51, -153, -255, -357, -459, -561, -663, -765,
+   56,  168,  280,  392,  505,  617,  729,  841,  -56, -168, -280, -392, -505, -617, -729, -841,
+   61,  184,  308,  431,  555,  678,  802,  925,  -61, -184, -308, -431, -555, -678, -802, -925,
+   68,  204,  340,  476,  612,  748,  884, 1020,  -68, -204, -340, -476, -612, -748, -884,-1020,
+   74,  223,  373,  522,  672,  821,  971, 1120,  -74, -223, -373, -522, -672, -821, -971,-1120,
+   82,  246,  411,  575,  740,  904, 1069, 1233,  -82, -246, -411, -575, -740, -904,-1069,-1233,
+   90,  271,  452,  633,  814,  995, 1176, 1357,  -90, -271, -452, -633, -814, -995,-1176,-1357,
+   99,  298,  497,  696,  895, 1094, 1293, 1492,  -99, -298, -497, -696, -895,-1094,-1293,-1492,
+  109,  328,  547,  766,  985, 1204, 1423, 1642, -109, -328, -547, -766, -985,-1204,-1423,-1642,
+  120,  360,  601,  841, 1083, 1323, 1564, 1804, -120, -360, -601, -841,-1083,-1323,-1564,-1804,
+  132,  397,  662,  927, 1192, 1457, 1722, 1987, -132, -397, -662, -927,-1192,-1457,-1722,-1987,
+  145,  436,  728, 1019, 1311, 1602, 1894, 2185, -145, -436, -728,-1019,-1311,-1602,-1894,-2185,
+  160,  480,  801, 1121, 1442, 1762, 2083, 2403, -160, -480, -801,-1121,-1442,-1762,-2083,-2403,
+  176,  528,  881, 1233, 1587, 1939, 2292, 2644, -176, -528, -881,-1233,-1587,-1939,-2292,-2644,
+  194,  582,  970, 1358, 1746, 2134, 2522, 2910, -194, -582, -970,-1358,-1746,-2134,-2522,-2910
+};
+
 __inline static void writeram(void *p, Uint32 v)
 {
 	YMDELTATPCMSOUND *sndp = p;
 
-	sndp->rambuf[(sndp->common.mem >> 1) & sndp->rammask] = v;
+	sndp->rambuf[(sndp->common.mem >> 1) & sndp->rammask] = (Uint8)v;
 	sndp->common.mem += 1 << 1;
 }
 
@@ -75,7 +128,11 @@ __inline static Uint32 readram(void *p)
 		{
 			sndp->common.play = sndp->common.start;
 			sndp->common.step = 0;
+			if(sndp->ymdeltatpcm_type==MSM5205){
+				sndp->common.scale = 0;
+			}else{
 			sndp->common.scale = 127;
+		}
 		}
 		else
 		{
@@ -88,16 +145,25 @@ __inline static Uint32 readram(void *p)
 __inline static void DelrtatStep(void *p, Uint32 data)
 {
 	YMDELTATPCMSOUND *sndp = p;
+	if(sndp->ymdeltatpcm_type==MSM5205){
+		sndp->common.scale = sndp->common.scale + scaletable[(sndp->common.step << 4) + (data & 0xf)];
+		if (sndp->common.scale >  2047) sndp->common.scale = 2047;
+		if (sndp->common.scale < -2048) sndp->common.scale = -2048;
 
-	if (data & 8)
-		sndp->common.step -= (table_step[data & 7] * sndp->common.scale) >> 3;
-	else
-		sndp->common.step += (table_step[data & 7] * sndp->common.scale) >> 3;
-	if (sndp->common.step > ((1 << 15) - 1)) sndp->common.step = ((1 << 15) - 1);
-	if (sndp->common.step < -(1 << 15)) sndp->common.step = -(1 << 15);
-	sndp->common.scale = (sndp->common.scale * table_scale[data]) >> 6;
-	if (sndp->common.scale > 24576) sndp->common.scale = 24576;
-	if (sndp->common.scale < 127) sndp->common.scale = 127;
+		sndp->common.step += table_step[(data & 7) + 8];
+		if (sndp->common.step > 48) sndp->common.step = 48;
+		if (sndp->common.step < 0) sndp->common.step = 0;
+	}else{
+		if (data & 8)
+			sndp->common.step -= (table_step[data & 7] * sndp->common.scale) >> 3;
+		else
+			sndp->common.step += (table_step[data & 7] * sndp->common.scale) >> 3;
+		if (sndp->common.step > ((1 << 15) - 1)) sndp->common.step = ((1 << 15) - 1);
+		if (sndp->common.step < -(1 << 15)) sndp->common.step = -(1 << 15);
+		sndp->common.scale = (sndp->common.scale * table_scale[data]) >> 6;
+		if (sndp->common.scale > 24576) sndp->common.scale = 24576;
+		if (sndp->common.scale < 127) sndp->common.scale = 127;
+	}
 }
 
 #if (((-1) >> 1) == -1)
@@ -125,12 +191,18 @@ static void sndsynth(void *sp, Int32 *p)
 			{
 				DelrtatStep(sndp, readram(sndp));
 			} while (--step);
+			if(sndp->ymdeltatpcm_type==MSM5205){
+				sndp->common.output = sndp->common.scale * sndp->common.level32;
+			}else{
 			sndp->common.output = sndp->common.step * sndp->common.level32;
+			}
 			sndp->common.output = SSR(sndp->common.output, 8 + 2);
 		}
+		if(chmask[DEV_ADPCM_CH1]){
 		p[0] += sndp->common.output;
 		p[1] += sndp->common.output;
 	}
+}
 }
 
 
@@ -139,7 +211,7 @@ static void sndwrite(void *p, Uint32 a, Uint32 v)
 {
 	YMDELTATPCMSOUND *sndp = p;
 
-	sndp->common.regs[a] = v;
+	sndp->common.regs[a] = (Uint8)v;
 	switch (a)
 	{
 		/* START,REC,MEMDATA,REPEAT,SPOFF,--,--,RESET */
@@ -149,14 +221,18 @@ static void sndwrite(void *p, Uint32 a, Uint32 v)
 				sndp->common.key = 1;
 				sndp->common.play = sndp->common.start;
 				sndp->common.step = 0;
+				if(sndp->ymdeltatpcm_type==MSM5205){
+					sndp->common.scale = 0;
+				}else{
 				sndp->common.scale = 127;
+			}
 			}
 			if (v & 1) sndp->common.key = 0;
 			break;
 		/* L,R,-,-,SAMPLE,DA/AD,RAMTYPE,ROM */
-		case 0x01:	/* Control Register 2 */
-			sndp->romrambuf  = (sndp->common.regs[1] & 1) ? sndp->rombuf  : sndp->rambuf;
-			sndp->romrammask = (sndp->common.regs[1] & 1) ? sndp->rommask : sndp->rammask;
+		case 0x01:	/* Control Register 2 */	//MSX-AUDIOにADPCM用ROMは無いはずなので無効化
+//			sndp->romrambuf  = (sndp->common.regs[1] & 1) ? sndp->rombuf  : sndp->rambuf;
+//			sndp->romrammask = (sndp->common.regs[1] & 1) ? sndp->rommask : sndp->rammask;
 			break;
 		case 0x02:	/* Start Address L */
 		case 0x03:	/* Start Address H */
@@ -180,9 +256,13 @@ static void sndwrite(void *p, Uint32 a, Uint32 v)
 			if (sndp->common.deltan < 0x100) sndp->common.deltan = 0x100;
 			break;
 		case 0x0b:	/* Level Control */
-			sndp->common.level = v;
+			sndp->common.level = (Uint8)v;
 			sndp->common.level32 = ((Int32)(sndp->common.level * LogToLin(sndp->logtbl, sndp->common.mastervolume, LOG_LIN_BITS - 15))) >> 7;
+			if(sndp->ymdeltatpcm_type==MSM5205){
+				sndp->common.output = sndp->common.scale * sndp->common.level32;
+			}else{
 			sndp->common.output = sndp->common.step * sndp->common.level32;
+			}
 			sndp->common.output = SSR(sndp->common.output, 8 + 2);
 			break;
 	}
@@ -315,12 +395,10 @@ KMIF_SOUND_DEVICE *YMDELTATPCMSoundAlloc(Uint32 ymdeltatpcm_type , Uint8 *pcmbuf
 		sndrelease(sndp);
 		return 0;
 	}
-/* EMSCRIPTEN complete merge later XXX
 	//ここからレジスタビュアー設定
 	sndpr = sndp;
 	if(ioview_ioread_DEV_ADPCM ==NULL)ioview_ioread_DEV_ADPCM = ioview_ioread_bf;
 	if(ioview_ioread_DEV_ADPCM2==NULL)ioview_ioread_DEV_ADPCM2= ioview_ioread_bf2;
 	//ここまでレジスタビュアー設定
-*/
 	return &sndp->kmif;
 }

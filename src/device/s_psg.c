@@ -1,15 +1,7 @@
-#include "format/audiosys.h"
-
 #include "kmsnddev.h"
 #include "divfix.h"
 #include "s_logtbl.h"
 #include "s_psg.h"
-
-#include <stdio.h>
-
-#define DEVICE PSG
-#include "assist.h"
-
 
 #define DCFIX 0/*8*/
 #define ANAEX 0
@@ -355,14 +347,11 @@ static void sndsynth(void *ctx, Int32 *p)
 	Int32 accum = 0;
 	sndp->common.rngout = PSGSoundNoiseStep(sndp);
 	sndp->common.envout = PSGSoundEnvelopeStep(sndp);
-    if (chmask[0])
-        accum += PSGSoundSquare(sndp, &sndp->square[0]);
-    if (chmask[1])
-        accum += PSGSoundSquare(sndp, &sndp->square[1]);
-    if (chmask[2])
-        accum += PSGSoundSquare(sndp, &sndp->square[2]);
+	accum += PSGSoundSquare(sndp, &sndp->square[0]) * chmask[DEV_AY8910_CH1];
+	accum += PSGSoundSquare(sndp, &sndp->square[1]) * chmask[DEV_AY8910_CH2];
+	accum += PSGSoundSquare(sndp, &sndp->square[2]) * chmask[DEV_AY8910_CH3];
 	MSXSoundDaStep(sndp);
-	if (chmask[3])
+	if (chmask[DEV_MSX_DA])
 		accum += LogToLin(sndp->logtbl,sndp->common.mastervolume, LOG_LIN_BITS-7)
 		* (sndp->common.daenable ? (sndp->common.davolume*7 + (1<<16))/7 : sndp->common.davolume);
 #ifdef VOLUME_3
@@ -407,20 +396,7 @@ __inline static void sndwritereg(PSGSOUND *sndp, Uint32 a, Uint32 v)
 		case 0x0: case 0x1:
 		case 0x2: case 0x3:
 		case 0x4: case 0x5:
-        {
 			sndp->square[a >> 1].regs[a & 1] = v;
-            
-            int ch = a >> 1;
-            int reg =
-            ((sndp->square[ch].regs[1] & 0x0f) << 8) |
-            (sndp->square[ch].regs[0] & 0xff);
-            
-            if (reg)
-                chstate[ch].freq = NES_CPUCLOCK / ((reg+1) << 5);
-            else
-                chstate[ch].freq = 0;
-
-        }
 			break;
 		case 0x6:
 			sndp->noise.regs[0] = v;
@@ -441,10 +417,10 @@ __inline static void sndwritereg(PSGSOUND *sndp, Uint32 a, Uint32 v)
 			sndp->square[a - 0x8].regs[2] = v;
 			break;
 		case 0xD:
+			sndp->envelope.cycles = 0;
+			sndp->envelope.adr = env_table[sndp->regs[0xd] & 0xF];
 		case 0xB: case 0xC:
 			sndp->envelope.regs[a - 0xB] = v;
-			sndp->envelope.adr = env_table[sndp->regs[0xd] & 0xF];
-			sndp->envelope.cycles = 0;
 			break;
 	}
 }
@@ -464,10 +440,6 @@ static void sndwrite(void *ctx, Uint32 a, Uint32 v)
 			sndp->common.adr = v;
 			break;
 		case 1:
-            if (nes_logfile)
-				fprintf(nes_logfile,"PSG:%02X:%02X\n",
-                        sndp->common.adr, v);
-
 			sndwritereg(sndp, sndp->common.adr, v);
 			break;
 		case 2:
@@ -550,19 +522,6 @@ static Uint32 ioview_ioread_bf(Uint32 a){
 static Uint32 ioview_ioread_bf2(Uint32 a){
 	if(a==0x0)return sndpr->common.daenable;else return 0x100;
 }
-
-
-static void setmask(void *p, int dev, char *mask)
-{
-    chmask = mask;
-}
-
-static void setchstate(void *p, int dev, S_STATE *state)
-{
-    chstate = state;
-}
-
-
 //ここまでレジスタビュアー設定
 
 KMIF_SOUND_DEVICE *PSGSoundAlloc(Uint32 psg_type)
@@ -580,10 +539,6 @@ KMIF_SOUND_DEVICE *PSGSoundAlloc(Uint32 psg_type)
 	sndp->kmif.write = sndwrite;
 	sndp->kmif.read = sndread;
 	sndp->kmif.setinst = setinst;
-    
-    sndp->kmif.setmask = setmask;
-	sndp->kmif.setchstate = setchstate;
-    
 	sndp->logtbl = LogTableAddRef();
 	if (!sndp->logtbl)
 	{

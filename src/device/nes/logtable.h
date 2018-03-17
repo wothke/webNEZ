@@ -1,7 +1,7 @@
 #include "../nestypes.h"
 
 #define LOG_BITS 12
-#define LIN_BITS 7
+#define LIN_BITS 8
 #define LOG_LIN_BITS 30
 
 Uint32 LinearToLog(Int32 l);

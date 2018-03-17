@@ -5,14 +5,13 @@
 extern "C" {
 #endif
 
-#define SINTBL_BITS 11
+#define SINTBL_BITS 10
 #define AMTBL_BITS 8
 #define PMTBL_BITS 8
 #define PM_SHIFT 9
 #define ARTBL_BITS 7
 #define ARTBL_SHIFT 20
-#define TLLTBL_BITS 7
-
+#define TLLTBL_BITS 8
 typedef struct
 {
 	void *ctx;

@@ -29,6 +29,8 @@ typedef int				Int;
 typedef unsigned int	Uint;
 typedef signed int		Int32;
 typedef unsigned int	Uint32;
+typedef signed long		Int64;
+typedef unsigned long	Uint64;
 typedef signed short	Int16;
 typedef unsigned short	Uint16;
 typedef signed char		Int8;

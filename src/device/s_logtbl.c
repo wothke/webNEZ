@@ -10,7 +10,7 @@ static void LogTableRelease(void *ctx)
 static KMIF_LOGTABLE log_static_tables = {
 	&log_static_tables;
 	LogTableRelease,
-#include "s_logt.h"
+//#include "s_logt.h"
 };
 
 
@@ -75,6 +75,7 @@ KMIF_LOGTABLE *LogTableAddRef(void)
 		log_tables = XMALLOC(sizeof(KMIF_LOGTABLE));
 		if (log_tables)
 		{
+			XMEMSET(log_tables, 0, sizeof(KMIF_LOGTABLE));
 			log_tables->ctx = log_tables;
 			log_tables->release = LogTableRelease;
 			LogTableCalc(log_tables);

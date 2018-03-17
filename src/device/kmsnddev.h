@@ -19,9 +19,6 @@ typedef struct {
 	void (*write)(void *ctx, Uint32 a, Uint32 v);
 	Uint32 (*read)(void *ctx, Uint32 a);
 	void (*setinst)(void *ctx, Uint32 n, void *p, Uint32 l);
-	void (*setmask)(void *ctx, int dev, char *mask);
-	void (*setchstate)(void *ctx, int dev, S_STATE *state);
-    
 #if 0
 	void (*setrate)(void *ctx, Uint32 clock, Uint32 freq);
 	void (*getinfo)(void *ctx, KMCH_INFO *cip, );
@@ -105,7 +102,7 @@ enum{//‡”Ô‚ğ•Ï‚¦‚½‚ç‹°‚ë‚µ‚¢‚±‚Æ‚É‚È‚é
 
 	DEV_MAX,
 };
-//extern Uint8 chmask[0x80];
+extern Uint8 chmask[0x80];
 
 #ifdef __cplusplus
 }

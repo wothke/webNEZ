@@ -5,9 +5,7 @@
 extern "C" {
 #endif
 
-void N106SetState(S_STATE *state);
 void N106SoundInstall(void);
-void N106SetMask(char *);
 
 #ifdef __cplusplus
 }

@@ -2,7 +2,7 @@
 
 Copyright (C) 2018 Juergen Wothke
 
-This is a JavaScript/WebAudio plugin of "NEZplug(++)" used to emulate music of various consoles: Famicom (.nes), 
+This is a JavaScript/WebAudio plugin of "NEZplug++" used to emulate music of various consoles: Famicom (.nes), 
 Game Gear, Game Boy, MSX (.kss), ZX Spectrum (.ay), Hudson (.hes), etc. This plugin is designed to work with my generic WebAudio 
 ScriptProcessor music player (see separate project). 
 
@@ -44,23 +44,15 @@ The project is based on: http://offgao.net/program/nezplug++.html and https://gi
 
 ## Project
 
-I had first tried to use NEZplug++ 0.9.4.8 + 3 + 24.00 (see http://offgao.net/program/nezplug++.html) 
-but even after fixing the obvious problems reported by CLANG, the resulting code would still crash with 
-"segmentation faults" somewhere in the waveform generation logic.. I did not feel like migrating/fixing 
-some obviously outdated codebase (especially since the project's http://nezplug.sourceforge.net/
-page seems to be down).
+I had first used https://github.com/BouKiCHi/nezplay (NEZplug Version 0.9.5.3) - which worked 
+nicely out of the box (whereas NEZplug++ has CLANG issues).
 
-When I found https://github.com/BouKiCHi/nezplay (NEZplug Version 0.9.5.3 - apparently there are
-more recent versions than the above) I decided to give it another try and indeed not only does that 
-version compile properly, it also works right out of the box.
-
-I then copied the m_sgc.c from older NEZplug++ and patched it into the nezplay version (to 
-add some "Sega Master System","Game Gear","Coleco Vision" support). It seems to play .sgc files 
-now but I don't know if there might be "finer points" that I have missed. This version now runs on
-defaults without use of separate settings (or separate ROM files - I don't know if that scenario
-even exists). If somebody else wants to do respective "fine tuning" he is cordially invited to
-do that work. I also patched the code to set meaningful display infos (title, artist, copyright)
-for SGC songs.
+I later merged the NEZplug++ 0.9.4.8 + 3 + 24.00 (see http://offgao.net/program/nezplug++.html) 
+sources back into the functioning NEZplay, i.e. the codebase is now mainly NEZplug++ with little 
+remains of NEZplay glue code. The version information suggests that the code is now based on 
+a somewhat older NEZplug version (0.9.4.8 instead of 0.9.5.3) - but with extra "Sega Master System",
+"Game Gear","Coleco Vision" support. (eventhough 0.9.4.8 seems to be the most recent version
+according to http://nezplug.sourceforge.net/ ...)
 
 All the "Web" specific additions (i.e. the whole point of this project) are contained in the 
 "emscripten" subfolder.

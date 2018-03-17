@@ -1,5 +1,7 @@
+#include "m_nsf.h"
 
-static unsigned s_type = 2;
+extern NSFNSF *nsfnsf;
+
 extern void FDSSoundInstall1(void);
 extern void FDSSoundInstall2(void);
 extern void FDSSoundInstall3(void);
@@ -7,7 +9,7 @@ extern void FDSSoundInstall3(void);
 
 void FDSSoundInstall(void)
 {
-	switch (s_type)
+	switch (nsfnsf ? nsfnsf->fds_type : 2)
 	{
 	case 1:
 		FDSSoundInstall1();
@@ -15,9 +17,11 @@ void FDSSoundInstall(void)
 	case 3:
 		FDSSoundInstall2();
 		break;
+#if 0
 	case 0:
 //		if (FDSSoundInstallExt()) break;
 		/* fall down */
+#endif
 	default:
 	case 2:
 		FDSSoundInstall3();
@@ -27,5 +31,6 @@ void FDSSoundInstall(void)
 
 void FDSSelect(unsigned type)
 {
-	s_type = type;
+	if (nsfnsf)
+		nsfnsf->fds_type = type;
 }
