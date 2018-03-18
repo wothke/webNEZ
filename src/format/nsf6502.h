@@ -7,8 +7,8 @@
 extern "C" {
 #endif
 
-typedef Uint (__fastcall *READHANDLER)(Uint a);
-typedef void (__fastcall *WRITEHANDLER)(Uint a, Uint v);
+typedef Uint (__fastcall *READHANDLER)(void*, Uint a);
+typedef void (__fastcall *WRITEHANDLER)(void*, Uint a, Uint v);
 
 typedef struct NES_READ_HANDLER_TAG {
 	Uint min;
@@ -24,17 +24,17 @@ typedef struct NES_WRITE_HANDLER_TAG {
 	struct NES_WRITE_HANDLER_TAG *next;
 } NES_WRITE_HANDLER;
 
-void NESMemoryHandlerInitialize();
-void NESReadHandlerInstall(NES_READ_HANDLER *ph);
-void NESWriteHandlerInstall(NES_WRITE_HANDLER *ph);
+void NESMemoryHandlerInitialize(NEZ_PLAY *);
+void NESReadHandlerInstall(NEZ_PLAY *, NES_READ_HANDLER *ph);
+void NESWriteHandlerInstall(NEZ_PLAY *, NES_WRITE_HANDLER *ph);
 
-Uint NSF6502Install();
-Uint NES6502GetCycles();
-void NES6502Irq();
-//void NES6502SetIrqCount(Int A);
-Uint NES6502ReadDma(Uint A);
-Uint NES6502Read(Uint A);
-void NES6502Write(Uint A, Uint V);
+Uint NSF6502Install(NEZ_PLAY*);
+Uint NES6502GetCycles(NEZ_PLAY*);
+void NES6502Irq(NEZ_PLAY*);
+//void NES6502SetIrqCount(NEZ_PLAY *pNezPlay, Int A);
+Uint NES6502ReadDma(NEZ_PLAY*, Uint A);
+Uint NES6502Read(NEZ_PLAY*, Uint A);
+void NES6502Write(NEZ_PLAY*, Uint A, Uint V);
 
 
 #ifdef __cplusplus

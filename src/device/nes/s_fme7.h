@@ -5,7 +5,7 @@
 extern "C" {
 #endif
 
-void FME7SoundInstall(void);
+void FME7SoundInstall(NEZ_PLAY *);
 
 #ifdef __cplusplus
 }

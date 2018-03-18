@@ -7,10 +7,10 @@
 extern "C" {
 #endif
 
-Uint32 SGCLoad(Uint8 *pData, Uint uSize);
+Uint32 SGCLoad(NEZ_PLAY *, Uint8 *pData, Uint uSize);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* M_SGC_H__ */
+#endif /* M_KSS_H__ */

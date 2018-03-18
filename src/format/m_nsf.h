@@ -2,6 +2,7 @@
 #define M_NSF_H__
 
 #include "nestypes.h"
+#include "nezplug.h"
 #include "nsf6502.h"
 #include "device/kmsnddev.h"
 #include "km6502/km6502.h"
@@ -59,9 +60,9 @@ typedef struct NSFNSF_TAG {
 } NSFNSF;
 
 /* NSF player */
-Uint NSFLoad(Uint8 *pData, Uint uSize);
-Uint8 *NSFGetHeader();
-Uint NSFDeviceInitialize();
+Uint NSFLoad(NEZ_PLAY*, Uint8 *pData, Uint uSize);
+Uint8 *NSFGetHeader(NEZ_PLAY*);
+Uint NSFDeviceInitialize(NEZ_PLAY*);
 
 #ifdef __cplusplus
 }

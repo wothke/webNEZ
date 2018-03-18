@@ -47,8 +47,6 @@ typedef struct {
 #endif
 } ZXAY;
 
-ZXAY *zxay= 0;
-
 static Int32 execute(ZXAY *THIS_)
 {
 	Uint32 cycles;
@@ -66,22 +64,22 @@ static Int32 execute(ZXAY *THIS_)
 	return 0;
 }
 
-static void synth(Int32 *d)
+__inline static void synth(ZXAY *THIS_, Int32 *d)
 {
-	zxay->sndp->synth(zxay->sndp->ctx, d);
-	zxay->amstrad_sndp->synth(zxay->amstrad_sndp->ctx, d);
+	THIS_->sndp->synth(THIS_->sndp->ctx, d);
+	THIS_->amstrad_sndp->synth(THIS_->amstrad_sndp->ctx, d);
 }
 
-static void volume(Uint32 v)
+__inline static void volume(ZXAY *THIS_, Uint32 v)
 {
-	zxay->sndp->volume(zxay->sndp->ctx, v);
-	zxay->amstrad_sndp->volume(zxay->amstrad_sndp->ctx, v);
+	THIS_->sndp->volume(THIS_->sndp->ctx, v);
+	THIS_->amstrad_sndp->volume(THIS_->amstrad_sndp->ctx, v);
 }
 
 
-static void vsync_setup()
+static void vsync_setup(ZXAY *THIS_)
 {
-	kmevent_settimer(&zxay->kme, zxay->vsync_id, 313 * 4 * 342 / 6);
+	kmevent_settimer(&THIS_->kme, THIS_->vsync_id, 313 * 4 * 342 / 6);
 }
 
 static Uint32 read_event(void *ctx, Uint32 a)
@@ -190,14 +188,14 @@ static Uint8 *ZXAYOffset(Uint8 *p)
 	return p + ofs - 0x8000;
 }
 
-static void reset()
+static void reset(NEZ_PLAY *pNezPlay)
 {
-	ZXAY *THIS_ = zxay;
+	ZXAY *THIS_ = pNezPlay->zxay;
 	Uint32 i, freq, song, reginit;
 	Uint8 *p, *p2;
 
-	freq = NESAudioFrequencyGet();
-	song = SONGINFO_GetSongNo() - 1;
+	freq = NESAudioFrequencyGet(pNezPlay);
+	song = SONGINFO_GetSongNo(pNezPlay->song) - 1;
 	if (song >= THIS_->maxsong) song = THIS_->startsong - 1;
 
 	/* sound reset */
@@ -261,8 +259,8 @@ static void reset()
 	THIS_->ram[0x0038] = 0xC9;
 	if (!THIS_->initaddr) THIS_->initaddr = GetWordBE(p);	/* DEFAULT */
 	SetWordLE(&THIS_->ram[0x0001], THIS_->initaddr);
-	SONGINFO_SetInitAddress(THIS_->initaddr);
-	SONGINFO_SetPlayAddress(THIS_->playaddr);
+	SONGINFO_SetInitAddress(pNezPlay->song, THIS_->initaddr);
+	SONGINFO_SetPlayAddress(pNezPlay->song, THIS_->playaddr);
 	SetWordLE(&THIS_->ram[0x0004], THIS_->playaddr);
 
 	do
@@ -342,7 +340,7 @@ static void terminate(ZXAY *THIS_)
 	XFREE(THIS_);
 }
 
-static Uint32 load(ZXAY *THIS_, Uint8 *pData, Uint32 uSize)
+static Uint32 load(NEZ_PLAY *pNezPlay, ZXAY *THIS_, Uint8 *pData, Uint32 uSize)
 {
 	XMEMSET(THIS_, 0, sizeof(ZXAY));
 	THIS_->sndp = THIS_->amstrad_sndp = 0;
@@ -355,10 +353,10 @@ static Uint32 load(ZXAY *THIS_, Uint8 *pData, Uint32 uSize)
 	THIS_->maxsong = pData[0x10] + 1;
 	THIS_->startsong = pData[0x11] + 1;
 
-	SONGINFO_SetStartSongNo(THIS_->startsong);
-	SONGINFO_SetMaxSongNo(THIS_->maxsong);
-	SONGINFO_SetExtendDevice(0);
-	SONGINFO_SetChannel(1);
+	SONGINFO_SetStartSongNo(pNezPlay->song, THIS_->startsong);
+	SONGINFO_SetMaxSongNo(pNezPlay->song, THIS_->maxsong);
+	SONGINFO_SetExtendDevice(pNezPlay->song, 0);
+	SONGINFO_SetChannel(pNezPlay->song, 1);
 
 	THIS_->sndp = PSGSoundAlloc(PSG_TYPE_AY_3_8910);
 	THIS_->amstrad_sndp = PSGSoundAlloc(PSG_TYPE_YM2149);
@@ -368,20 +366,20 @@ static Uint32 load(ZXAY *THIS_, Uint8 *pData, Uint32 uSize)
 
 
 
-static Int32 __fastcall ZXAYExecuteZ80CPU(void )
+static Int32 __fastcall ZXAYExecuteZ80CPU(void *pNezPlay)
 {
-	return zxay ? execute(zxay) : 0;
+	return ((NEZ_PLAY*)pNezPlay)->zxay ? execute((ZXAY*)((NEZ_PLAY*)pNezPlay)->zxay) : 0;
 }
 
-static void __fastcall ZXAYSoundRenderStereo(Int32 *d)
+static void __fastcall ZXAYSoundRenderStereo(void *pNezPlay, Int32 *d)
 {
-	synth(d);
+	synth((ZXAY*)((NEZ_PLAY*)pNezPlay)->zxay, d);
 }
 
-static Int32 __fastcall ZXAYSoundRenderMono()
+static Int32 __fastcall ZXAYSoundRenderMono(void *pNezPlay)
 {
 	Int32 d[2] = { 0, 0 };
-	synth(d);
+	synth((ZXAY*)((NEZ_PLAY*)pNezPlay)->zxay, d);
 #if (((-1) >> 1) == -1)
 	return (d[0] + d[1]) >> 1;
 #else
@@ -395,11 +393,11 @@ const static NES_AUDIO_HANDLER zxay_audio_handler[] = {
 	{ 0, 0, 0, },
 };
 
-static void __fastcall ZXAYVolume(Uint32 v)
+static void __fastcall ZXAYVolume(void *pNezPlay, Uint32 v)
 {
-	if (zxay)
+	if (((NEZ_PLAY*)pNezPlay)->zxay)
 	{
-		volume(v);
+		volume((ZXAY*)((NEZ_PLAY*)pNezPlay)->zxay, v);
 	}
 }
 
@@ -408,9 +406,9 @@ const static NES_VOLUME_HANDLER zxay_volume_handler[] = {
 	{ 0, }, 
 };
 
-static void __fastcall ZXAYReset(void)
+static void __fastcall ZXAYReset(void *pNezPlay)
 {
-	if (zxay) reset();
+	if (((NEZ_PLAY*)pNezPlay)->zxay) reset((NEZ_PLAY*)pNezPlay);
 }
 
 const static NES_RESET_HANDLER zxay_reset_handler[] = {
@@ -418,12 +416,12 @@ const static NES_RESET_HANDLER zxay_reset_handler[] = {
 	{ 0,                  0, },
 };
 
-static void __fastcall ZXAYTerminate()
+static void __fastcall ZXAYTerminate(void *pNezPlay)
 {
-	if (zxay)
+	if (((NEZ_PLAY*)pNezPlay)->zxay)
 	{
-		terminate(zxay);
-		zxay = 0;
+		terminate((ZXAY*)((NEZ_PLAY*)pNezPlay)->zxay);
+		((NEZ_PLAY*)pNezPlay)->zxay = 0;
 	}
 }
 
@@ -432,23 +430,23 @@ const static NES_TERMINATE_HANDLER zxay_terminate_handler[] = {
 	{ 0, },
 };
 
-Uint32 ZXAYLoad(Uint8 *pData, Uint32 uSize)
+Uint32 ZXAYLoad(NEZ_PLAY *pNezPlay, Uint8 *pData, Uint32 uSize)
 {
 	Uint32 ret;
 	ZXAY *THIS_;
 	
 	THIS_ = (ZXAY *)XMALLOC(sizeof(ZXAY));
 	if (!THIS_) return NESERR_SHORTOFMEMORY;
-	ret = load(THIS_, pData, uSize);
+	ret = load(pNezPlay, THIS_, pData, uSize);
 	if (ret)
 	{
 		terminate(THIS_);
 		return ret;
 	}
-	zxay = THIS_;
-	NESAudioHandlerInstall(zxay_audio_handler);
-	NESVolumeHandlerInstall(zxay_volume_handler);
-	NESResetHandlerInstall(zxay_reset_handler);
-	NESTerminateHandlerInstall(zxay_terminate_handler);
+	pNezPlay->zxay = THIS_;
+	NESAudioHandlerInstall(pNezPlay, zxay_audio_handler);
+	NESVolumeHandlerInstall(pNezPlay, zxay_volume_handler);
+	NESResetHandlerInstall(pNezPlay->nrh, zxay_reset_handler);
+	NESTerminateHandlerInstall(&pNezPlay->nth, zxay_terminate_handler);
 	return ret;
 }

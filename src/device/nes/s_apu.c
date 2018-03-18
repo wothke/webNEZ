@@ -33,9 +33,9 @@
 #define AMPTML_MAX (1 << (AMPTML_BITS))
 
 #if 1
-#define VOL_SHIFT 0 /* å¾ŒæœŸå‹ */
+#define VOL_SHIFT 0 /* ??? */
 #else
-#define VOL_SHIFT 1 /* åˆæœŸå‹ */
+#define VOL_SHIFT 1 /* ??? */
 #endif
 
 typedef struct {
@@ -51,6 +51,7 @@ typedef struct {
 	Uint8 looping_enable;	/* envelope decay looping enable */
 	Uint8 volume;			/* volume */
 } ENVELOPEDECAY;
+
 typedef struct {
 	Uint8 ch;				/* sweep channel */
 	Uint8 active;			/* sweep active */
@@ -113,6 +114,7 @@ typedef struct {
 	Uint8 ct2;
 	Uint32 dpcmout;
 } NESAPU_TRIANGLE;
+
 typedef struct {
 	LENGTHCOUNTER lc;
 	LINEARCOUNTER li;
@@ -171,7 +173,7 @@ typedef struct {
 	//Int32 amptbl[1 << AMPTML_BITS];
 } APUSOUND;
 
-static APUSOUND apu;
+
 
 Int32 NSF_noise_random_reset = 0;
 Int32 NESAPUVolume = 64;
@@ -185,7 +187,7 @@ Int32 NSF_2A03Type = 1;
 const static Uint8 square_duty_table[][8] = 
 {
 	{0,0,0,1,0,0,0,0} , {0,0,0,1,1,0,0,0} , {0,0,0,1,1,1,1,0} , {1,1,1,0,0,1,1,1} ,
-	{1,0,0,0,0,0,0,0} , {1,1,1,1,0,0,0,0} , {1,1,0,0,0,0,0,0} , {1,1,1,1,1,1,0,0}  //Æ’NÆ’\Å’ÃÅ Â·â€¹@â€šÃŒDutyâ€Ã¤â€šÃŒâ€šÃâ€šÃâ€šÂ­â€šÃ¨â€¢Ã”â€šÃâ€šÃ„â€šÃ©â€šÃ¢â€šÃ‚ 
+	{1,0,0,0,0,0,0,0} , {1,1,1,1,0,0,0,0} , {1,1,0,0,0,0,0,0} , {1,1,1,1,1,1,0,0}  //ƒNƒ\ŒİŠ·‹@‚ÌDuty”ä‚Ì‚Ğ‚Á‚­‚è•Ô‚Á‚Ä‚é‚â‚Â 
 };
 //	{ {0,1,0,0,0,0,0,0} , {0,1,1,0,0,0,0,0} , {0,1,1,1,1,0,0,0} , {0,1,1,1,1,1,1,0} };
 
@@ -218,7 +220,7 @@ static const Uint32 spd_limit_table[8] =
 	0x787, 0x7C1, 0x7E0, 0x7F0,
 };
 
-static Uint32 dpcm_freq_table[16] =
+static const Uint32 dpcm_freq_table[16] =
 {
 	428, 380, 340, 320,
 	286, 254, 226, 214,
@@ -232,17 +234,17 @@ __inline static void LengthCounterStep(LENGTHCOUNTER *lc)
 }
 
 /*
-ÂE4008â€šÃŒMSBâ€šÂª0â€šÃŒÂÃªÂâ€¡â€šÃ‰400Bâ€šÃ‰Ââ€˜â€šÂ­â€šÃ†ÂAË†ÃˆÅ’Ã£â€šÃ4008â€šÃ‰â€°Â½â€šÃŒâ€™lâ€šÃ°Ââ€˜â€šÂ¢â€šÃ„â€šÃ â€“Â³Å½â€¹â€šÂ³â€šÃªâ€šÃ©ÂB
-ÂE4008â€šÃŒMSBâ€šÂª1â€šÃŒÂÃªÂâ€¡â€šÃ‰400Bâ€šÃ‰Ââ€˜â€šÂ­â€šÃ†ÂAË†ÃˆÅ’Ã£4008â€šÃ‰80â€šÃ…ÂÃâ€°Â¹ÂE81-FFâ€šÃ…â€Â­ÂÂºâ€šÂªâ€°Ã‚â€\ÂB
-Â@â€šÂ½â€šÂ¾â€šÂµÂA00-7Fâ€šÃŒâ€™lâ€šÃ°Ââ€˜â€šÂ¢â€šÂ½ÂÃªÂâ€¡ÂAâ€šÂ»â€šÃŒÂuÅ Ã”â€šÃ‰Å eÅ½Ã­Æ’JÆ’EÆ’â€œÆ’^â€šÂªâ€”LÅ’Ã¸ÂEâ€šÂ»â€šÃŒÆ’JÆ’EÆ’â€œÆ’gâ€™lâ€šÃ…Æ’JÆ’EÆ’â€œÆ’gÅ JÅ½nâ€šÃ†â€šÃˆâ€šÃ¨ÂA
-Â@â€šÂ»â€šÃªË†ÃˆÅ’Ã£â€šÃŒ4008Ââ€˜â€šÂ«ÂÅ¾â€šÃâ€šÃÂAÆ’LÂ[Æ’IÆ’tÆ’JÆ’EÆ’â€œÆ’^â€šÃâ€”LÅ’Ã¸â€“Â³Å’Ã¸Ë†ÃˆÅ Oâ€“Â³Å½â€¹â€šÃ†â€šÃˆâ€šÃ©ÂB
-ÂE4008â€šÃŒâ€™lâ€¢ÃÂXâ€šÃ‰â€šÃ¦â€šÃ©ÂÃâ€°Â¹ÂEâ€Â­ÂÂºâ€šÃŒÆ’^Æ’CÆ’~Æ’â€œÆ’Oâ€šÃÂAÅ½OÅ pâ€gâ€°Â¹â€™Â·Æ’JÆ’EÆ’â€œÆ’gÅ½Å¾Âiâ€šÃ‚â€šÃœâ€šÃ¨ÂA4017-MSBâ€šÂª0â€šÃŒÅ½Å¾â€šÃ240HzÅ½Ã¼Å ÃºÂjÂB
-ÂE400BÂâ€˜â€šÂ«ÂÅ¾â€šÃâ€šÃ‰â€šÃ¦â€šÃ©Æ’LÂ[Æ’IÆ’â€œâ€šÃÂAÆ’JÆ’EÆ’â€œÆ’gÅ½Ã¼Å Ãºâ€šÂªâ€”Ë†â€šÂ½â€šÂ â€šÃ†â€šÃ‰â€Â­ÂÂºâ€šÂ³â€šÃªâ€šÃ©ÂB
-ÂEÅ½Ã¼â€gÂâ€â€šÃÂâ€˜â€šÂ¢â€šÃ„ÂuÅ½Å¾â€šÃ‰â€Â½â€°fâ€šÂ³â€šÃªâ€šÃ©ÂBâ€šÂ»â€šÃŒâ€šÂ½â€šÃŸÂA8-10bitâ€“Ãšâ€šÃ°â€šÃœâ€šÂ½â€šÂ®Å½Ã¼â€gÂâ€â€¢ÃÂXâ€šÃÂA
-Â@â€¢ÃÂXâ€šÃŒÂâ€¡Å Ã”â€šÃŒÅ½Ã¼â€gÂâ€â€šÃŒâ€™lâ€šÃ‰â€šÃ¦â€šÃâ€šÃ„â€šÃÆ’vÆ’`Æ’mÆ’CÆ’Yâ€šÂªâ€šÃ†â€šÂ«â€šÃ‡â€šÂ«Âoâ€šÃ©ÂB
+E4008‚ÌMSB‚ª0‚Ìê‡‚É400B‚É‘‚­‚ÆAˆÈŒã‚Í4008‚É‰½‚Ì’l‚ğ‘‚¢‚Ä‚à–³‹‚³‚ê‚éB
+E4008‚ÌMSB‚ª1‚Ìê‡‚É400B‚É‘‚­‚ÆAˆÈŒã4008‚É80‚ÅÁ‰¹E81-FF‚Å”­º‚ª‰Â”\B
+@‚½‚¾‚µA00-7F‚Ì’l‚ğ‘‚¢‚½ê‡A‚»‚ÌuŠÔ‚ÉŠeíƒJƒEƒ“ƒ^‚ª—LŒøE‚»‚ÌƒJƒEƒ“ƒg’l‚ÅƒJƒEƒ“ƒgŠJn‚Æ‚È‚èA
+@‚»‚êˆÈŒã‚Ì4008‘‚«‚İ‚ÍAƒL[ƒIƒtƒJƒEƒ“ƒ^‚Í—LŒø–³ŒøˆÈŠO–³‹‚Æ‚È‚éB
+E4008‚Ì’l•ÏX‚É‚æ‚éÁ‰¹E”­º‚Ìƒ^ƒCƒ~ƒ“ƒO‚ÍAOŠp”g‰¹’·ƒJƒEƒ“ƒgi‚Â‚Ü‚èA4017-MSB‚ª0‚Ì‚Í240HzüŠújB
+E400B‘‚«‚İ‚É‚æ‚éƒL[ƒIƒ“‚ÍAƒJƒEƒ“ƒgüŠú‚ª—ˆ‚½‚ ‚Æ‚É”­º‚³‚ê‚éB
+Eü”g”‚Í‘‚¢‚Äu‚É”½‰f‚³‚ê‚éB‚»‚Ì‚½‚ßA8-10bit–Ú‚ğ‚Ü‚½‚®ü”g”•ÏX‚ÍA
+@•ÏX‚Ì‡ŠÔ‚Ìü”g”‚Ì’l‚É‚æ‚Á‚Ä‚Íƒvƒ`ƒmƒCƒY‚ª‚Æ‚«‚Ç‚«o‚éB
 */
 __inline static void LinearCounterStep(LINEARCOUNTER *li/*, Uint32 cps*/)
-	{
+{
 //	li->fc += cps;
 //	while (li->fc > li->cpf[0])
 //	{
@@ -256,8 +258,8 @@ __inline static void LinearCounterStep(LINEARCOUNTER *li/*, Uint32 cps*/)
 		else{
 			if(li->counter){
 				li->counter--;
+			}
 		}
-	}
 //		if (!li->tocount && li->counter)
 //		{
 //			li->start = 0;
@@ -276,7 +278,7 @@ static void EnvelopeDecayStep(ENVELOPEDECAY *ed)
 		ed->timer = ed->rate;
 		if (ed->counter || ed->looping_enable){
 			ed->counter = (ed->counter - 1) & 0xF;
-	}
+		}
 	}else
 		ed->timer--;
 }
@@ -291,7 +293,7 @@ static void SweepStep(SWEEP *sw, Uint32 *wl)
 			if(!sw->ch){
 				if (*wl > 0)*wl += ~(*wl >> sw->shifter);
 			}else{
-			*wl -= (*wl >> sw->shifter);
+				*wl -= (*wl >> sw->shifter);
 			}
 		}
 		else
@@ -353,7 +355,7 @@ static Int32 NESAPUSoundSquareRender(NESAPU_SQUARE *ch)
 				ch->st+=ch->pt / (((ch->wl + 1) << CPS_BITS)>>(SQUARE_RENDERS+1));
 				ch->pt%=((ch->wl + 1) << CPS_BITS);
 				ch->st&= 0x7;
-				//wlâ€šÂª000Hâ€šÂ¾â€šÃ†â€°Â¹â€šÃÂoâ€”Ãâ€šÂ³â€šÃªâ€šÃˆâ€šÂ¢ÂH
+				//wl‚ª000H‚¾‚Æ‰¹‚Ío—Í‚³‚ê‚È‚¢H
 				ch->output = ch->wl != 0 ? ((ch->ed.disable ? ch->ed.volume : ch->ed.counter) * square_duty_avg[ch->duty]) : 0;
 				ch->output = LinearToLog(ch->output) + ch->mastervolume;
 				ch->output = -LogToLinear(ch->output, LOG_LIN_BITS - LIN_BITS - 9 + VOL_SHIFT) * SQ_VOL;
@@ -375,7 +377,7 @@ static Int32 NESAPUSoundSquareRender(NESAPU_SQUARE *ch)
 							? (ch->ed.disable ? ch->ed.volume : ch->ed.counter)<<1 : 0;
 						ch->output <<= SQ_VOL_BIT; 
 					}
-			}
+				}
 		}
 	}
 	if (ch->mute) return 0;
@@ -410,6 +412,7 @@ static void NESAPUSoundTriangleCount(NESAPU_TRIANGLE *ch)
 		}
 		ch->fp++;if(ch->fp >= 4+ch->cpf[2])ch->fp=0;
 	}
+
 }
 static Int32 NESAPUSoundTriangleRender(NESAPU_TRIANGLE *ch)
 {
@@ -422,7 +425,7 @@ static Int32 NESAPUSoundTriangleRender(NESAPU_TRIANGLE *ch)
 	ch->output *= TR_VOL;
 
 	if (ch->key && (ch->li.clock_disable ? ch->li.load : ch->li.counter ) &&  ch->lc.counter) {
-		/* Å’Ãƒâ€šÂ¢Æ’^Æ’CÆ’v 
+		/* ŒÃ‚¢ƒ^ƒCƒv 
 		ch->pt += ch->cps << TRIANGLE_RENDERS;
 		if (ch->wl <= 4){
 			ch->st += ch->pt / (((ch->wl + 1) << CPS_BITS)>>TRIANGLE_RENDERS);
@@ -448,18 +451,18 @@ static Int32 NESAPUSoundTriangleRender(NESAPU_TRIANGLE *ch)
 			}
 		}
 		*/
-		//ÂVâ€šÂµâ€šÂ¢Æ’^Æ’CÆ’vÂBÆ’Å’Æ’â€œÆ’_Â[â€“Ë†â€šÃ‰Ë†Ãªâ€™Ã¨â€šÃŒÅ’Â¸Å½Zâ€šÃ°Âsâ€šÂ¢ÂAÆ’AÆ’â€œÆ’_Â[Æ’tÆ’ÂÂ[Å½Å¾â€šÃ‰Å½Ã¼â€gÂâ€Æ’Å’Æ’WÆ’XÆ’^â€™lâ€šÃ…
-		//Æ’JÆ’EÆ’â€œÆ’gÆ’Å Æ’ZÆ’bÆ’gâ€šÂ·â€šÃ©â€¢Ã»Å½Â®ÂB
-		//9bitâ€“Ãšâ€šÃ°â€šÃœâ€šÂ½â€šÂ®â€šÃ†â€šÂ«â€šÃŒÆ’vÆ’`Æ’mÆ’CÆ’Yâ€šÃŒÂÃ¦â€šÃ¨â€¢Ã»â€œIâ€šÃ‰ÂAâ€šÂ½â€šÃ”â€šÃ±Å½Ã€â€¹@â€šÃŒâ€œÂ®ÂÃ¬â€šÃâ€šÂ±â€šÃªâ€šÂ©â€šÃ†ÂB
+		//V‚µ‚¢ƒ^ƒCƒvBƒŒƒ“ƒ_[–ˆ‚Éˆê’è‚ÌŒ¸Z‚ğs‚¢AƒAƒ“ƒ_[ƒtƒ[‚Éü”g”ƒŒƒWƒXƒ^’l‚Å
+		//ƒJƒEƒ“ƒgƒŠƒZƒbƒg‚·‚é•û®B
+		//9bit–Ú‚ğ‚Ü‚½‚®‚Æ‚«‚Ìƒvƒ`ƒmƒCƒY‚Ìæ‚è•û“I‚ÉA‚½‚Ô‚ñÀ‹@‚Ì“®ì‚Í‚±‚ê‚©‚ÆB
 		if(ch->wlb < 4){
-			//Å½Ã¼â€gÂâ€Æ’Å’Æ’WÆ’XÆ’^â€šÂªâ€¹Ã‰â€™[â€šÃ‰ÂÂ¬â€šÂ³â€šÂ¢â€šÃ†â€šÂ«ÂBâ€šÂ±â€šÂ±â€šÃâ€œKâ€œâ€“â€šÃ…â€”Ã‡â€šÂ¢â€šÂ©â€šÅ¸ÂB
-			/*//â€šÂ±â€šÃªâ€šÂ¿â€šÃ†Âdâ€šÂ¢
+			//ü”g”ƒŒƒWƒXƒ^‚ª‹É’[‚É¬‚³‚¢‚Æ‚«B‚±‚±‚Í“K“–‚Å—Ç‚¢‚©‚ŸB
+			/*//‚±‚ê‚¿‚Æd‚¢
 			ch->pt += ch->cps << TRIANGLE_RENDERS;
 
 			ch->ct -= ch->pt / (1<<CPS_BITS);
 			ch->pt %= (1<<CPS_BITS);
 
-			while (ch->ct < 0)//Æ’JÆ’EÆ’â€œÆ’^â€šÂªÆ’AÆ’â€œÆ’_Â[Æ’tÆ’ÂÂ[â€šÂµâ€šÂ½ÂÃªÂâ€¡
+			while (ch->ct < 0)//ƒJƒEƒ“ƒ^‚ªƒAƒ“ƒ_[ƒtƒ[‚µ‚½ê‡
 			{
 				ch->ct += ch->wlb;
 				ch->ct2++;
@@ -481,7 +484,7 @@ static Int32 NESAPUSoundTriangleRender(NESAPU_TRIANGLE *ch)
 			ch->ct -= ch->pt / (1<<CPS_BITS);
 			ch->pt %= (1<<CPS_BITS);
 
-			while (ch->ct < 0)//Æ’JÆ’EÆ’â€œÆ’^â€šÂªÆ’AÆ’â€œÆ’_Â[Æ’tÆ’ÂÂ[â€šÂµâ€šÂ½ÂÃªÂâ€¡
+			while (ch->ct < 0)//ƒJƒEƒ“ƒ^‚ªƒAƒ“ƒ_[ƒtƒ[‚µ‚½ê‡
 			{
 				ch->ct += ch->wlb;
 				ch->ct2++;
@@ -537,7 +540,7 @@ static Int32 NESAPUSoundNoiseRender(NESAPU_NOISE *ch)
 
 	ch->output = (ch->rng & 1) * (ch->ed.disable ? ch->ed.volume : ch->ed.counter);
 	ch->output *= NOISE_VOL;
-	//Æ’NÆ’\Å’ÃÅ Â·â€¹@â€šÃÂAâ€šÃ¢â€šÂ½â€šÃ§â€šÃ†Æ’mÆ’CÆ’Yâ€šÂªâ€šÃ…â€šÂ©â€šÂ¢ÂB
+	//ƒNƒ\ŒİŠ·‹@‚ÍA‚â‚½‚ç‚ÆƒmƒCƒY‚ª‚Å‚©‚¢B
 	if(NSF_2A03Type==2)ch->output *= 2;
 
 	ch->pt += ch->cps << NOISE_RENDERS;
@@ -548,7 +551,7 @@ static Int32 NESAPUSoundNoiseRender(NESAPU_NOISE *ch)
 
 		ch->pt -= ch->wl << (CPS_BITS + 1);
 
-		/* â€°Â¹Å½Â¿Å’Ã¼ÂÃ£â€šÃŒâ€šÂ½â€šÃŸ */
+		/* ‰¹¿Œüã‚Ì‚½‚ß */
 		ch->rngcount++;
 		if( ch->rngcount >= (1<<NOISE_RENDERS)){
 			ch->rngcount = 0;
@@ -557,7 +560,7 @@ static Int32 NESAPUSoundNoiseRender(NESAPU_NOISE *ch)
 
 			ch->output = (ch->rng & 1) * (ch->ed.disable ? ch->ed.volume : ch->ed.counter);
 			ch->output *= NOISE_VOL;
-			//Æ’NÆ’\Å’ÃÅ Â·â€¹@â€šÃÂAâ€šÃ¢â€šÂ½â€šÃ§â€šÃ†Æ’mÆ’CÆ’Yâ€šÂªâ€šÃ…â€šÂ©â€šÂ¢ÂB
+			//ƒNƒ\ŒİŠ·‹@‚ÍA‚â‚½‚ç‚ÆƒmƒCƒY‚ª‚Å‚©‚¢B
 			if(NSF_2A03Type==2)ch->output *= 2;
 		}
 	}
@@ -569,30 +572,30 @@ static Int32 NESAPUSoundNoiseRender(NESAPU_NOISE *ch)
 	return outputbuf * ch->dpcmout / DPCM_VOL_DOWN;
 }
 
-static void NESAPUSoundDpcmRead(NESAPU_DPCM *ch)
+__inline static void NESAPUSoundDpcmRead(NEZ_PLAY *pNezPlay, NESAPU_DPCM *ch)
 {
-	ch->input = (Uint8)NES6502ReadDma(ch->adr);
+	ch->input = (Uint8)NES6502ReadDma(pNezPlay, ch->adr);
 	if(++ch->adr > 0xffff)ch->adr = 0x8000;
 	
 }
 
-static void NESAPUSoundDpcmStart(NESAPU_DPCM *ch)
+static void NESAPUSoundDpcmStart(NEZ_PLAY* pNezPlay, NESAPU_DPCM *ch)
 {
 	ch->adr = 0xC000 + ((Uint)ch->start_adr << 6);
 	ch->length = (((Uint)ch->start_length << 4) + 1) << 3;
 	ch->irq_report = 0;
 /*
 	if (ch->irq_enable && !ch->loop_enable){
-		//Å â€â€šÃ¨ÂÅ¾â€šÃâ€šÂªâ€šÂ©â€šÂ©â€šÃ©ÂÃ°Å’Ââ€šÃŒÂÃªÂâ€¡
-		NES6502SetIrqCount( ch->length * ch->wl);
+		//Š„‚è‚İ‚ª‚©‚©‚éğŒ‚Ìê‡
+		NES6502SetIrqCount((NEZ_PLAY*)pNezPlay, ch->length * ch->wl);
 	}
 */
-	NESAPUSoundDpcmRead(ch);
+	NESAPUSoundDpcmRead(pNezPlay, ch);
 }
 
-static Int32 __fastcall NESAPUSoundDpcmRender(void)
+static Int32 __fastcall NESAPUSoundDpcmRender(void *pNezPlay)
 {
-#define ch (&apu.dpcm)
+#define ch (&((APUSOUND*)((NSFNSF*)((NEZ_PLAY*)pNezPlay)->nsf)->apu)->dpcm)
 #define DPCM_OUT ch->dactbl[((ch->dacout<<1) + ch->dacout0)] * DPCM_VOL;
 
 	Int32 outputbuf=0,count=0;
@@ -627,13 +630,13 @@ static Int32 __fastcall NESAPUSoundDpcmRender(void)
 				{
 					if (ch->loop_enable)
 					{
-						NESAPUSoundDpcmStart(ch);	/*loop */
+						NESAPUSoundDpcmStart((NEZ_PLAY*)pNezPlay, ch);	/*loop */
 					}
 					else
 					{
 						if (ch->irq_enable)
 						{
-							NES6502Irq();	// irq gen
+							NES6502Irq((NEZ_PLAY*)pNezPlay);	// irq gen
 							ch->irq_report = 0x80;
 						}
 						
@@ -643,7 +646,7 @@ static Int32 __fastcall NESAPUSoundDpcmRender(void)
 				}
 				else if ((ch->length & 7) == 0)
 				{
-					NESAPUSoundDpcmRead(ch);
+					NESAPUSoundDpcmRead((NEZ_PLAY*)pNezPlay, ch);
 				}
 				ch->output = DPCM_OUT;
 			}
@@ -655,12 +658,12 @@ static Int32 __fastcall NESAPUSoundDpcmRender(void)
 	count++;
 	outputbuf /= count;
 	if (NESRealDAC) {
-		apu.triangle.dpcmout = 
-		apu.noise.dpcmout = 
+		((APUSOUND*)((NSFNSF*)((NEZ_PLAY*)pNezPlay)->nsf)->apu)->triangle.dpcmout = 
+		((APUSOUND*)((NSFNSF*)((NEZ_PLAY*)pNezPlay)->nsf)->apu)->noise.dpcmout = 
 			DPCM_VOL_DOWN - (outputbuf / DPCM_VOL);
 	}else{
-		apu.triangle.dpcmout = 
-		apu.noise.dpcmout = 
+		((APUSOUND*)((NSFNSF*)((NEZ_PLAY*)pNezPlay)->nsf)->apu)->triangle.dpcmout = 
+		((APUSOUND*)((NSFNSF*)((NEZ_PLAY*)pNezPlay)->nsf)->apu)->noise.dpcmout = 
 			DPCM_VOL_DOWN;
 	}
 	return	outputbuf;
@@ -672,275 +675,278 @@ static Int32 __fastcall NESAPUSoundDpcmRender(void)
 #undef ch
 }
 
-static Int32 __fastcall APUSoundRender(void)
+
+static Int32 __fastcall APUSoundRender(void *pNezPlay)
 {
+	APUSOUND *apu = ((NSFNSF*)((NEZ_PLAY*)pNezPlay)->nsf)->apu;
 	Int32 accum = 0 , sqout = 0 , tndout = 0;
-	sqout += NESAPUSoundSquareRender(&apu.square[0]) * chmask[DEV_2A03_SQ1];
-	sqout += NESAPUSoundSquareRender(&apu.square[1]) * chmask[DEV_2A03_SQ2];
-//DACâ€šÃŒÅ½dâ€”lâ€šÂªâ€šÃ¦â€šÂ­â€¢Âªâ€šÂ©â€šÃ©â€šÃœâ€šÃ…â€šÃâ€“Â³Å’Ã¸â€šÃ‰â€šÂµâ€šÃ„â€šÂ¨â€šÂ­
+	sqout += NESAPUSoundSquareRender(&apu->square[0]) * chmask[DEV_2A03_SQ1];
+	sqout += NESAPUSoundSquareRender(&apu->square[1]) * chmask[DEV_2A03_SQ2];
+//DAC‚Ìd—l‚ª‚æ‚­•ª‚©‚é‚Ü‚Å‚Í–³Œø‚É‚µ‚Ä‚¨‚­
 //	if (NESRealDAC) {
-//		sqout = apu.amptbl[sqout >> (16 + 1 + 1 - AMPTML_BITS)];
+//		sqout = apu->amptbl[sqout >> (16 + 1 + 1 - AMPTML_BITS)];
 //	} else {
 		sqout >>= 1;
 //	}
-	accum += sqout * apu.square[0].mastervolume / 20/*20kÆ’Â¶*/;
-	tndout += NESAPUSoundDpcmRender() * chmask[DEV_2A03_DPCM];
-	tndout += NESAPUSoundTriangleRender(&apu.triangle) * chmask[DEV_2A03_TR];
-	tndout += NESAPUSoundNoiseRender(&apu.noise) * chmask[DEV_2A03_NOISE];
+	accum += sqout * apu->square[0].mastervolume / 20/*20kƒ¶*/;
+	tndout += NESAPUSoundDpcmRender(pNezPlay) * chmask[DEV_2A03_DPCM];
+	tndout += NESAPUSoundTriangleRender(&apu->triangle) * chmask[DEV_2A03_TR];
+	tndout += NESAPUSoundNoiseRender(&apu->noise) * chmask[DEV_2A03_NOISE];
 //	if (NESRealDAC) {
-//		tndout = apu.amptbl[tndout >> (16 + 1 + 1 - AMPTML_BITS)];
+//		tndout = apu->amptbl[tndout >> (16 + 1 + 1 - AMPTML_BITS)];
 //	} else {
 		tndout >>= 1;
 //	}
-	accum += tndout * apu.triangle.mastervolume / 12/*12kÆ’Â¶*/;
-	//accum = apu.amptbl[tndout >> (26 - AMPTML_BITS)];
+	accum += tndout * apu->triangle.mastervolume / 12/*12kƒ¶*/;
+	//accum = apu->amptbl[tndout >> (26 - AMPTML_BITS)];
 	accum -= 0x60000;
 	return accum * NESAPUVolume / 8;
 }
 
-static NES_AUDIO_HANDLER s_apu_audio_handler[] = {
+const static NES_AUDIO_HANDLER s_apu_audio_handler[] = {
 	{ 1, APUSoundRender, }, 
 	{ 0, 0, }, 
 };
 
-static void __fastcall APUSoundVolume(Uint volume)
+static void __fastcall APUSoundVolume(void *pNezPlay, Uint volume)
 {
+	APUSOUND *apu = ((NSFNSF*)((NEZ_PLAY*)pNezPlay)->nsf)->apu;
 	
 	if(volume > 255) volume = 255;
 	volume = 256 - volume;
 	/* SND1 */
-	apu.square[0].mastervolume = volume;
-	apu.square[1].mastervolume = volume;
+	apu->square[0].mastervolume = volume;
+	apu->square[1].mastervolume = volume;
 
 	/* SND2 */
-	apu.triangle.mastervolume = volume;
-	apu.noise.mastervolume = volume;
-	apu.dpcm.mastervolume = volume;
-
+	apu->triangle.mastervolume = volume;
+	apu->noise.mastervolume = volume;
+	apu->dpcm.mastervolume = volume;
 }
 
-static NES_VOLUME_HANDLER s_apu_volume_handler[] = {
+const static NES_VOLUME_HANDLER s_apu_volume_handler[] = {
 	{ APUSoundVolume, },
 	{ 0, }, 
 };
 
-static void __fastcall APUSoundWrite(Uint address, Uint value)
+static void __fastcall APUSoundWrite(void *pNezPlay, Uint address, Uint value)
 {
+	APUSOUND *apu = ((NSFNSF*)((NEZ_PLAY*)pNezPlay)->nsf)->apu;
 	if (0x4000 <= address && address <= 0x4017)
 	{
-		apu.regs[address - 0x4000] = (Uint8)value;
+		apu->regs[address - 0x4000] = (Uint8)value;
 		switch (address)
 		{
 			case 0x4000:	case 0x4004:
 				{
 					int ch = address >= 0x4004;
 					if (value & 0x10)
-						apu.square[ch].ed.volume = (Uint8)(value & 0x0f);
-					apu.square[ch].ed.rate   = (Uint8)(value & 0x0f);
-					apu.square[ch].ed.disable = (Uint8)(value & 0x10);
-					apu.square[ch].lc.clock_disable = (Uint8)(value & 0x20);
-					apu.square[ch].ed.looping_enable = (Uint8)(value & 0x20);
-					//Æ’NÆ’\Å’ÃÅ Â·â€¹@â€šÃŒâ€šÃ–â€šÃ±â€šÃ„â€šÂ±Dutyâ€Ã¤â€šÃ‰â€šÂ·â€šÃ©â€šÃŒâ€šÃ°ÂAâ€šÂ±â€šÂ±â€šÃ…â€šÃ¢â€šÃ©ÂB
+						apu->square[ch].ed.volume = (Uint8)(value & 0x0f);
+					apu->square[ch].ed.rate   = (Uint8)(value & 0x0f);
+					apu->square[ch].ed.disable = (Uint8)(value & 0x10);
+					apu->square[ch].lc.clock_disable = (Uint8)(value & 0x20);
+					apu->square[ch].ed.looping_enable = (Uint8)(value & 0x20);
+					//ƒNƒ\ŒİŠ·‹@‚Ì‚Ö‚ñ‚Ä‚±Duty”ä‚É‚·‚é‚Ì‚ğA‚±‚±‚Å‚â‚éB
 					if(NSF_2A03Type==2){
-						apu.square[ch].duty = ((value >> 6) & 3)|4;
+						apu->square[ch].duty = ((value >> 6) & 3)|4;
 					}else{
-						apu.square[ch].duty = (value >> 6) & 3;
+						apu->square[ch].duty = (value >> 6) & 3;
 					}
 				}
 				break;
 			case 0x4001:	case 0x4005:
 				{
 					int ch = address >= 0x4004;
-					apu.square[ch].sw.shifter = (Uint8)(value & 7);
-					apu.square[ch].sw.direction = (Uint8)(value & 8);
-					apu.square[ch].sw.rate = (Uint8)((value >> 4) & 7);
-					apu.square[ch].sw.active = (Uint8)(value & 0x80);
-					apu.square[ch].sw.timer = apu.square[ch].sw.rate;
+					apu->square[ch].sw.shifter = (Uint8)(value & 7);
+					apu->square[ch].sw.direction = (Uint8)(value & 8);
+					apu->square[ch].sw.rate = (Uint8)((value >> 4) & 7);
+					apu->square[ch].sw.active = (Uint8)(value & 0x80);
+					apu->square[ch].sw.timer = apu->square[ch].sw.rate;
 				}
 				break;
 			case 0x4002:	case 0x4006:
 				{
 					int ch = address >= 0x4004;
-					apu.square[ch].wl &= 0xffffff00;
-					apu.square[ch].wl += value;
+					apu->square[ch].wl &= 0xffffff00;
+					apu->square[ch].wl += value;
 				}
 				break;
 			case 0x4003:	case 0x4007:
 				{
 					int ch = address >= 0x4004;
-					//apu.square[ch].pt = 0;
+					//apu->square[ch].pt = 0;
 #if 1
-					apu.square[ch].st = 0x0;
-					apu.square[ch].ct = 0x30;
+					apu->square[ch].st = 0x0;
+					apu->square[ch].ct = 0x30;
 #endif
-					apu.square[ch].wl &= 0x0ff;
-					apu.square[ch].wl += (value & 7) << 8;
-					apu.square[ch].lc.counter = vbl_length_table[value >> 3] * 2;
-					apu.square[ch].ed.counter = 0xf;
-					apu.square[ch].ed.timer = apu.square[ch].ed.rate + 1;
+					apu->square[ch].wl &= 0x0ff;
+					apu->square[ch].wl += (value & 7) << 8;
+					apu->square[ch].lc.counter = vbl_length_table[value >> 3] * 2;
+					apu->square[ch].ed.counter = 0xf;
+					apu->square[ch].ed.timer = apu->square[ch].ed.rate + 1;
 				}
 				break;
 			case 0x4008:
-				apu.triangle.li.tocount = (Uint8)(value & 0x80);
-				apu.triangle.li.load = (Uint8)(value & 0x7f);
-				apu.triangle.lc.clock_disable = (Uint8)(value & 0x80);
-					/*
-				if(apu.triangle.li.clock_disable){
-					apu.triangle.li.counter = apu.triangle.li.load;
-					apu.triangle.li.clock_disable = (Uint8)(value & 0x80);
+				apu->triangle.li.tocount = (Uint8)(value & 0x80);
+				apu->triangle.li.load = (Uint8)(value & 0x7f);
+				apu->triangle.lc.clock_disable = (Uint8)(value & 0x80);
+				/*
+				if(apu->triangle.li.clock_disable){
+					apu->triangle.li.counter = apu->triangle.li.load;
+					apu->triangle.li.clock_disable = (Uint8)(value & 0x80);
 				}*/
-				//if(apu.triangle.li.clock_disable)
-				//	apu.triangle.li.mode=1;
+				//if(apu->triangle.li.clock_disable)
+				//	apu->triangle.li.mode=1;
 
-				//apu.triangle.li.start = (Uint8)(value & 0x80);
+				//apu->triangle.li.start = (Uint8)(value & 0x80);
 				break;
 			case 0x400a:
-				apu.triangle.wl &= 0x700;
-				apu.triangle.wl += value;
-//				if(apu.triangle.wlb == 0){
-//					apu.triangle.wl = apu.triangle.wlb;
+				apu->triangle.wl &= 0x700;
+				apu->triangle.wl += value;
+//				if(apu->triangle.wlb == 0){
+//					apu->triangle.wl = apu->triangle.wlb;
 //				}
-				//apu.triangle.wl = apu.triangle.wlb;
-				//apu.triangle.b180c = 0;
+				//apu->triangle.wl = apu->triangle.wlb;
+				//apu->triangle.b180c = 0;
 				break;
 			case 0x400b:
-				apu.triangle.wl &= 0x0ff;
-				apu.triangle.wl += (value & 7) << 8;
-/*				if (!apu.triangle.lc.counter
-				 || !apu.triangle.li.counter
-				 || !apu.triangle.li.mode)
-*///				apu.triangle.wl = apu.triangle.wlb;
-				apu.triangle.lc.counter = vbl_length_table[value >> 3] * 2;
-				//apu.triangle.li.mode = apu.triangle.li.clock_disable;
-				//apu.triangle.li.counter = apu.triangle.li.load;
-                    
-				//apu.triangle.li.clock_disable = apu.triangle.li.tocount;
-				apu.triangle.lc.clock_disable = apu.triangle.li.tocount;
+				apu->triangle.wl &= 0x0ff;
+				apu->triangle.wl += (value & 7) << 8;
+/*				if (!apu->triangle.lc.counter
+				 || !apu->triangle.li.counter
+				 || !apu->triangle.li.mode)
+*///				apu->triangle.wl = apu->triangle.wlb;
+				apu->triangle.lc.counter = vbl_length_table[value >> 3] * 2;
+				//apu->triangle.li.mode = apu->triangle.li.clock_disable;
+				//apu->triangle.li.counter = apu->triangle.li.load;
 
-				apu.triangle.li.start = 0x80;
-				//apu.triangle.wl = apu.triangle.wlb;
-				//apu.triangle.b180c = 0;
+				//apu->triangle.li.clock_disable = apu->triangle.li.tocount;
+				apu->triangle.lc.clock_disable = apu->triangle.li.tocount;
+
+				apu->triangle.li.start = 0x80;
+				//apu->triangle.wl = apu->triangle.wlb;
+				//apu->triangle.b180c = 0;
 				break;
 			case 0x400c:
 				if (value & 0x10)
-					apu.noise.ed.volume = (Uint8)(value & 0x0f);
+					apu->noise.ed.volume = (Uint8)(value & 0x0f);
 				else
 				{
-					apu.noise.ed.rate = (Uint8)(value & 0x0f);
+					apu->noise.ed.rate = (Uint8)(value & 0x0f);
 				}
-				apu.noise.ed.disable = (Uint8)(value & 0x10);
-				apu.noise.lc.clock_disable = (Uint8)(value & 0x20);
-				apu.noise.ed.looping_enable = (Uint8)(value & 0x20);
+				apu->noise.ed.disable = (Uint8)(value & 0x10);
+				apu->noise.lc.clock_disable = (Uint8)(value & 0x20);
+				apu->noise.ed.looping_enable = (Uint8)(value & 0x20);
 				break;
 			case 0x400e:
-				//Ââ€°â€˜Ã£2A03â€šÃ…â€šÃÂAÆ’mÆ’CÆ’Y15â€™iÅ KÂâ€¢â€™ZÅ½Ã¼Å Ãºâ€“Â³â€šÂµâ€šÃˆâ€šÃŒâ€šÃ…ÂAâ€šÂ»â€šÃªâ€šÃ°Æ’Å’Æ’WÆ’XÆ’^â€šÂ¢â€šÂ¶â€šÃ¨â€šÃ…ÂÃ„Å’Â»ÂB
+				//‰‘ã2A03‚Å‚ÍAƒmƒCƒY15’iŠK•’ZüŠú–³‚µ‚È‚Ì‚ÅA‚»‚ê‚ğƒŒƒWƒXƒ^‚¢‚¶‚è‚ÅÄŒ»B
 				if(NSF_2A03Type==0){
-					apu.noise.wl = wavelength_converter_table[(value & 0x0f)==0xf ? (0xe) : (value & 0x0f)];
-					apu.noise.rngshort = 0;
+					apu->noise.wl = wavelength_converter_table[(value & 0x0f)==0xf ? (0xe) : (value & 0x0f)];
+					apu->noise.rngshort = 0;
 				}else{
-					apu.noise.wl = wavelength_converter_table[value & 0x0f];
-					apu.noise.rngshort = (Uint8)(value & 0x80);
+					apu->noise.wl = wavelength_converter_table[value & 0x0f];
+					apu->noise.rngshort = (Uint8)(value & 0x80);
 				}
 				break;
 			case 0x400f:
 				// apu.noise.rng = 0x8000;
-				apu.noise.ed.counter = 0xf;
-				apu.noise.lc.counter = vbl_length_table[value >> 3] * 2;
-				apu.noise.ed.timer = apu.noise.ed.rate + 1;
+				apu->noise.ed.counter = 0xf;
+				apu->noise.lc.counter = vbl_length_table[value >> 3] * 2;
+				apu->noise.ed.timer = apu->noise.ed.rate + 1;
 				break;
 
 			case 0x4010:
-				apu.dpcm.wl = dpcm_freq_table[value & 0x0F];
-				apu.dpcm.loop_enable = (Uint8)(value & 0x40);
-				apu.dpcm.irq_enable = (Uint8)(value & 0x80);
-				if (!apu.dpcm.irq_enable) apu.dpcm.irq_report = 0;
+				apu->dpcm.wl = dpcm_freq_table[value & 0x0F];
+				apu->dpcm.loop_enable = (Uint8)(value & 0x40);
+				apu->dpcm.irq_enable = (Uint8)(value & 0x80);
+				if (!apu->dpcm.irq_enable) apu->dpcm.irq_report = 0;
 				break;
 			case 0x4011:
 #if 0
-				if (apu.dpcm.first && (value & 0x7f))
+				if (apu->dpcm.first && (value & 0x7f))
 				{
-					apu.dpcm.first = 0;
-					apu.dpcm.dacbase = value & 0x7f;
+					apu->dpcm.first = 0;
+					apu->dpcm.dacbase = value & 0x7f;
 				}
 #endif
-				apu.dpcm.dacout = (value >> 1) & 0x3f;
-				apu.dpcm.dacout0 = value & 1;
+				apu->dpcm.dacout = (value >> 1) & 0x3f;
+				apu->dpcm.dacout0 = value & 1;
 				break;
 			case 0x4012:
-				apu.dpcm.start_adr = (Uint8)value;
+				apu->dpcm.start_adr = (Uint8)value;
 				break;
 			case 0x4013:
-				apu.dpcm.start_length = (Uint8)value;
+				apu->dpcm.start_length = (Uint8)value;
 				break;
 
 			case 0x4015:
 				if (value & 1)
-					apu.square[0].key = 1;
+					apu->square[0].key = 1;
 				else
 				{
-					apu.square[0].key = 0;
-					apu.square[0].lc.counter = 0;
+					apu->square[0].key = 0;
+					apu->square[0].lc.counter = 0;
 				}
 				if (value & 2)
-					apu.square[1].key = 1;
+					apu->square[1].key = 1;
 				else
 				{
-					apu.square[1].key = 0;
-					apu.square[1].lc.counter = 0;
+					apu->square[1].key = 0;
+					apu->square[1].lc.counter = 0;
 				}
 				if (value & 4)
-					apu.triangle.key = 1;
+					apu->triangle.key = 1;
 				else
 				{
-					apu.triangle.key = 0;
-					apu.triangle.lc.counter = 0;
-					apu.triangle.li.counter = 0;
-					apu.triangle.li.start = 0;
+					apu->triangle.key = 0;
+					apu->triangle.lc.counter = 0;
+					apu->triangle.li.counter = 0;
+					apu->triangle.li.start = 0;
 				}
 				if (value & 8)
-					apu.noise.key = 1;
+					apu->noise.key = 1;
 				else
 				{
-					apu.noise.key = 0;
-					apu.noise.lc.counter = 0;
+					apu->noise.key = 0;
+					apu->noise.lc.counter = 0;
 				}
 				if (value & 16)
 				{
-					if (!apu.dpcm.key)
+					if (!apu->dpcm.key)
 					{
-						apu.dpcm.key = 1;
-						NESAPUSoundDpcmStart(&apu.dpcm);
+						apu->dpcm.key = 1;
+						NESAPUSoundDpcmStart((NEZ_PLAY*)pNezPlay, &apu->dpcm);
 					}
 				}
 				else
 				{
-					apu.dpcm.key = 0;
+					apu->dpcm.key = 0;
 				}
 				break;
 			case 0x4017:
-					apu.square[0].fp = 0;
-					apu.square[1].fp = 0;
-					apu.triangle.fp = 0;
-					apu.noise.fp = 0;
+					apu->square[0].fp = 0;
+					apu->square[1].fp = 0;
+					apu->triangle.fp = 0;
+					apu->noise.fp = 0;
 
 
-					apu.square[0].fc = apu.cpf[0] - apu.square[0].cps;
-					apu.square[1].fc = apu.cpf[0] - apu.square[1].cps;
-					apu.triangle.fc = apu.cpf[0] - apu.triangle.cps;
-					apu.noise.fc = apu.cpf[0] - apu.noise.cps;
+					apu->square[0].fc = apu->cpf[0] - apu->square[0].cps;
+					apu->square[1].fc = apu->cpf[0] - apu->square[1].cps;
+					apu->triangle.fc = apu->cpf[0] - apu->triangle.cps;
+					apu->noise.fc = apu->cpf[0] - apu->noise.cps;
 					
-					apu.triangle.b180c = apu.triangle.cpb180;
+					apu->triangle.b180c = apu->triangle.cpb180;
 
-					NESAPUSoundSquareCount(&apu.square[0]);
-					NESAPUSoundSquareCount(&apu.square[1]);
-					NESAPUSoundTriangleCount(&apu.triangle);
-					NESAPUSoundNoiseCount(&apu.noise);
+					NESAPUSoundSquareCount(&apu->square[0]);
+					NESAPUSoundSquareCount(&apu->square[1]);
+					NESAPUSoundTriangleCount(&apu->triangle);
+					NESAPUSoundNoiseCount(&apu->noise);
 				if (value & 0x80){
-					//80Æ’tÆ’â€°Æ’O
-					apu.cpf[2] = 1;
+					//80ƒtƒ‰ƒO
+					apu->cpf[2] = 1;
 
 				}else{
-					apu.cpf[2] = 0;
+					apu->cpf[2] = 0;
 
 				}
 				break;
@@ -954,27 +960,25 @@ static NES_WRITE_HANDLER s_apu_write_handler[] =
 	{ 0,      0,      0, },
 };
 
-extern NSFNSF *nsfnsf;
-
-static Uint __fastcall APUSoundRead(Uint address)
+static Uint __fastcall APUSoundRead(void *pNezPlay, Uint address)
 {
+	APUSOUND *apu = ((NSFNSF*)((NEZ_PLAY*)pNezPlay)->nsf)->apu;
 	if (0x4015 == address)
 	{
 		int key = 0;
-		if (apu.square[0].key && apu.square[0].lc.counter) key |= 1;
-		if (apu.square[1].key && apu.square[1].lc.counter) key |= 2;
-		if (apu.triangle.key && apu.triangle.lc.counter) key |= 4;
-		if (apu.noise.key && apu.noise.lc.counter) key |= 8;
-		if (apu.dpcm.length) key |= 16;
-		key |= apu.dpcm.irq_report;
-		key |= nsfnsf->vsyncirq_fg;
-		apu.dpcm.irq_report = 0;
-		nsfnsf->vsyncirq_fg = 0;
+		if (apu->square[0].key && apu->square[0].lc.counter) key |= 1;
+		if (apu->square[1].key && apu->square[1].lc.counter) key |= 2;
+		if (apu->triangle.key && apu->triangle.lc.counter) key |= 4;
+		if (apu->noise.key && apu->noise.lc.counter) key |= 8;
+		if (apu->dpcm.length) key |= 16;
+		key |= apu->dpcm.irq_report;
+		key |= ((NSFNSF*)((NEZ_PLAY*)pNezPlay)->nsf)->vsyncirq_fg;
+		apu->dpcm.irq_report = 0;
+		((NSFNSF*)((NEZ_PLAY*)pNezPlay)->nsf)->vsyncirq_fg = 0;
 		return key;
-	//	return key | 0x40 | apu.dpcm.irq_report;
 	}
 	if (0x4000 <= address && address <= 0x4017)
-		return 0x40; //$4000Â`$4014â€šÃ°â€œÃ‡â€šÃ±â€šÃ…â€šÃ ÂAâ€˜Sâ€¢â€$40â€šÂªâ€¢Ã”â€šÃâ€šÃ„â€šÂ­â€šÃ©ÂiÆ’tÆ’@Æ’~Æ’xâ€™Â²â€šÃ—Âj 
+		return 0x40; //$4000`$4014‚ğ“Ç‚ñ‚Å‚àA‘S•”$40‚ª•Ô‚Á‚Ä‚­‚éiƒtƒ@ƒ~ƒx’²‚×j 
 	return 0xFF;
 }
 
@@ -1002,9 +1006,9 @@ static Uint32 DivFix(Uint32 p1, Uint32 p2, Uint32 fix)
 	return ret;
 }
 
-static Uint __fastcall GetNTSCPAL(void)
+static Uint __fastcall GetNTSCPAL(void *pNezPlay)
 {
-	Uint8 *nsfhead = NSFGetHeader();
+	Uint8 *nsfhead = NSFGetHeader((NEZ_PLAY*)pNezPlay);
 	if (nsfhead[0x7a] & 1){
 		return 13;
 	}
@@ -1014,23 +1018,24 @@ static Uint __fastcall GetNTSCPAL(void)
 	}
 
 }
-static void NESAPUSoundSquareReset(NESAPU_SQUARE *ch)
+
+static void NESAPUSoundSquareReset(void *pNezPlay, NESAPU_SQUARE *ch)
 {
 	XMEMSET(ch, 0, sizeof(NESAPU_SQUARE));
-	ch->cps = DivFix(NES_BASECYCLES, GetNTSCPAL() * NESAudioFrequencyGet(), CPS_BITS);
+	ch->cps = DivFix(NES_BASECYCLES, GetNTSCPAL(pNezPlay) * NESAudioFrequencyGet(pNezPlay), CPS_BITS);
 }
-static void NESAPUSoundTriangleReset(NESAPU_TRIANGLE *ch)
+static void NESAPUSoundTriangleReset(void *pNezPlay, NESAPU_TRIANGLE *ch)
 {
 	XMEMSET(ch, 0, sizeof(NESAPU_TRIANGLE));
-	ch->cps = DivFix(NES_BASECYCLES, GetNTSCPAL() * NESAudioFrequencyGet(), CPS_BITS);
+	ch->cps = DivFix(NES_BASECYCLES, GetNTSCPAL(pNezPlay) * NESAudioFrequencyGet(pNezPlay), CPS_BITS);
 	ch->st=0x8;
 }
-static void NESAPUSoundNoiseReset(NESAPU_NOISE *ch)
+static void NESAPUSoundNoiseReset(void *pNezPlay, NESAPU_NOISE *ch)
 {
 	XMEMSET(ch, 0, sizeof(NESAPU_NOISE));
-	ch->cps = DivFix(NES_BASECYCLES, GetNTSCPAL() * NESAudioFrequencyGet(), CPS_BITS);
+	ch->cps = DivFix(NES_BASECYCLES, GetNTSCPAL(pNezPlay) * NESAudioFrequencyGet(pNezPlay), CPS_BITS);
 
-	//Æ’mÆ’CÆ’Yâ€°Â¹â€šÃŒÆ’â€°Æ’â€œÆ’_Æ’â‚¬Ââ€°Å Ãºâ€°Â»
+	//ƒmƒCƒY‰¹‚Ìƒ‰ƒ“ƒ_ƒ€‰Šú‰»
 	if(NSF_noise_random_reset){
 		srand(time(NULL) + clock());
 		ch->rng = rand() + (rand()<<16);
@@ -1041,40 +1046,42 @@ static void NESAPUSoundNoiseReset(NESAPU_NOISE *ch)
 }
 
 
-static void NESAPUSoundDpcmReset(NESAPU_DPCM *ch)
+static void NESAPUSoundDpcmReset(void *pNezPlay, NESAPU_DPCM *ch)
 {
 	XMEMSET(ch, 0, sizeof(NESAPU_DPCM));
-	ch->cps = DivFix(NES_BASECYCLES, 12 * NESAudioFrequencyGet(), CPS_BITS);
+	ch->cps = DivFix(NES_BASECYCLES, 12 * NESAudioFrequencyGet(pNezPlay), CPS_BITS);
 }
 
-static void __fastcall APUSoundReset(void)
+static void __fastcall APUSoundReset(void* pNezPlay)
 {
-	Uint i;
-	NESAPUSoundSquareReset(&apu.square[0]);
-	NESAPUSoundSquareReset(&apu.square[1]);
-	NESAPUSoundTriangleReset(&apu.triangle);
-	NESAPUSoundNoiseReset(&apu.noise);
-	NESAPUSoundDpcmReset(&apu.dpcm);
-	apu.cpf[1] = DivFix(NES_BASECYCLES, 12 * 240, CPS_BITS);
-//		apu.cpf[2] = DivFix(NES_BASECYCLES, 12 * 240 * 5 / 6, CPS_BITS);
+	APUSOUND *apu = ((NSFNSF*)((NEZ_PLAY*)pNezPlay)->nsf)->apu;
+	NSFNSF *nsf = (NSFNSF*)((NEZ_PLAY*)pNezPlay)->nsf;
+	Uint32 i;
+	NESAPUSoundSquareReset(pNezPlay, &apu->square[0]);
+	NESAPUSoundSquareReset(pNezPlay, &apu->square[1]);
+	NESAPUSoundTriangleReset(pNezPlay, &apu->triangle);
+	NESAPUSoundNoiseReset(pNezPlay, &apu->noise);
+	NESAPUSoundDpcmReset(pNezPlay, &apu->dpcm);
+	apu->cpf[1] = DivFix(NES_BASECYCLES, 12 * 240, CPS_BITS);
+//		apu->cpf[2] = DivFix(NES_BASECYCLES, 12 * 240 * 5 / 6, CPS_BITS);
 
-	apu.cpf[0] = apu.cpf[1];
-	apu.cpf[2] = 0;
-	apu.square[0].sw.ch = 0;
-	apu.square[1].sw.ch = 1;
-	apu.square[0].cpf = apu.cpf;
-	apu.square[1].cpf = apu.cpf;
-	apu.triangle.cpf = apu.cpf;
-	apu.noise.cpf = apu.cpf;
-	apu.triangle.li.cpf = apu.cpf;
+	apu->cpf[0] = apu->cpf[1];
+	apu->cpf[2] = 0;
+	apu->square[0].sw.ch = 0;
+	apu->square[1].sw.ch = 1;
+	apu->square[0].cpf = apu->cpf;
+	apu->square[1].cpf = apu->cpf;
+	apu->triangle.cpf = apu->cpf;
+	apu->noise.cpf = apu->cpf;
+	apu->triangle.li.cpf = apu->cpf;
 
-	apu.triangle.cpb180 = DivFix(NES_BASECYCLES, 12 * NES_BASECYCLES / 180/8, CPS_BITS);//Å½bâ€™Ã¨
+	apu->triangle.cpb180 = DivFix(NES_BASECYCLES, 12 * NES_BASECYCLES / 180/8, CPS_BITS);//b’è
 
 	for (i = 0; i <= 0x17; i++)
 	{
-		APUSoundWrite(0x4000 + i, (i == 0x10) ? 0x10 : 0x00);
+		APUSoundWrite(pNezPlay, 0x4000 + i, (i == 0x10) ? 0x10 : 0x00);
 	}
-	APUSoundWrite(0x4015, 0x0f);
+	APUSoundWrite(pNezPlay, 0x4015, 0x0f);
 /*	
 #define TBL_MAX (1 << (AMPTML_BITS-2))
 #define OUTPUT_VOL 4
@@ -1083,64 +1090,70 @@ static void __fastcall APUSoundReset(void)
 
 	for (i = 0; i < (1 << AMPTML_BITS); i++)
 	{
-//		apu.amptbl[i] = (Int32)(i * OUTPUT_VOL - (CV_MAX / (1.0 - j * 0.99 / CV_MAX) * OUTPUT_VOL));
-//		apu.amptbl[i] = (Int32)((sqrt(SQRT_MIN + i / ((1 << AMPTML_BITS) * 0.05)) - sqrt(SQRT_MIN)) * 0x8000);
-//		apu.amptbl[i] = (Int32)((200.0 / (100.0 / ((i+1.0) / (1 << AMPTML_BITS)) + 100)) / 2 * 0x20000);
-//		apu.amptbl[i] = (Int32)(i - (sqrt(0.25 + i / ((1 << AMPTML_BITS) * 0.3)) - 0.5) * 0x2);
-		apu.amptbl[i] = (Int32)((i - (MINUS_CALC(i) - MINUS_CALC(0)) ) * 8);
+//		apu->amptbl[i] = (Int32)(i * OUTPUT_VOL - (CV_MAX / (1.0 - j * 0.99 / CV_MAX) * OUTPUT_VOL));
+//		apu->amptbl[i] = (Int32)((sqrt(SQRT_MIN + i / ((1 << AMPTML_BITS) * 0.05)) - sqrt(SQRT_MIN)) * 0x8000);
+//		apu->amptbl[i] = (Int32)((200.0 / (100.0 / ((i+1.0) / (1 << AMPTML_BITS)) + 100)) / 2 * 0x20000);
+//		apu->amptbl[i] = (Int32)(i - (sqrt(0.25 + i / ((1 << AMPTML_BITS) * 0.3)) - 0.5) * 0x2);
+		apu->amptbl[i] = (Int32)((i - (MINUS_CALC(i) - MINUS_CALC(0)) ) * 8);
 	}
 */
 
 	for (i = 0; i < 128; i++)
 	{
-		//DPCMâ€šÃŒDACâ€¢â€â€¢Âªâ€šÃÂA0F->10ÂA2F->30ÂA3F->40ÂA4F->50ÂA6F->70 â€šÃŒÂoâ€”ÃÂÂ·â€šÃÂAâ€˜Â¼â€šÃŒÅ½Å¾â€šÃ†â€Ã¤â€šÃ—â€šÃ„1.5â€{â€šÂ­â€šÃ§â€šÂ¢â€¢Ââ€šÂªâ€šÂ â€šÃ©ÂB
-		//â€šÂ³â€šÃ§â€šÃ‰ÂA1F->20ÂA5F->60 â€šÃŒÂoâ€”ÃÂÂ·â€šÃÂAâ€˜Â¼â€šÃŒÅ½Å¾â€šÃ†â€Ã¤â€šÃ—â€šÃ„2â€{â€šÂ­â€šÃ§â€šÂ¢â€¢Ââ€šÂªâ€šÂ â€šÃ©ÂB
-		apu.dpcm.dactbl[i] = i * 2 + (i >> 4) + ((i + 0x20) >> 5);
+		//DPCM‚ÌDAC•”•ª‚ÍA0F->10A2F->30A3F->40A4F->50A6F->70 ‚Ìo—Í·‚ÍA‘¼‚Ì‚Æ”ä‚×‚Ä1.5”{‚­‚ç‚¢•‚ª‚ ‚éB
+		//‚³‚ç‚ÉA1F->20A5F->60 ‚Ìo—Í·‚ÍA‘¼‚Ì‚Æ”ä‚×‚Ä2”{‚­‚ç‚¢•‚ª‚ ‚éB
+		apu->dpcm.dactbl[i] = i * 2 + (i >> 4) + ((i + 0x20) >> 5);
 	}
 
 #if 1
-	apu.dpcm.first = 1;
+	apu->dpcm.first = 1;
 #endif
 }
 
-static NES_RESET_HANDLER s_apu_reset_handler[] = {
+const static NES_RESET_HANDLER s_apu_reset_handler[] = {
 	{ NES_RESET_SYS_NOMAL, APUSoundReset, }, 
 	{ 0,                   0, }, 
 };
 
-static void __fastcall APUSoundTerm(void)
+static void __fastcall APUSoundTerm(void* pNezPlay)
 {
+	APUSOUND *apu = ((NSFNSF*)((NEZ_PLAY*)pNezPlay)->nsf)->apu;
+	if (apu)
+		XFREE(apu);
 }
 
-static NES_TERMINATE_HANDLER s_apu_terminate_handler[] = {
+const static NES_TERMINATE_HANDLER s_apu_terminate_handler[] = {
 	{ APUSoundTerm, }, 
 	{ 0, }, 
 };
 
-//â€šÂ±â€šÂ±â€šÂ©â€šÃ§Æ’Å’Æ’WÆ’XÆ’^Æ’rÆ’â€¦Æ’AÂ[ÂÃâ€™Ã¨
+//‚±‚±‚©‚çƒŒƒWƒXƒ^ƒrƒ…ƒA[İ’è
 Uint8 *regdata_2a03;
 Uint32 (*ioview_ioread_DEV_2A03)(Uint32 a);
 static Uint32 ioview_ioread_bf(Uint32 a){
 	if(a<=0x17)return regdata_2a03[a];else return 0x100;
 }
-//â€šÂ±â€šÂ±â€šÃœâ€šÃ…Æ’Å’Æ’WÆ’XÆ’^Æ’rÆ’â€¦Æ’AÂ[ÂÃâ€™Ã¨
+//‚±‚±‚Ü‚ÅƒŒƒWƒXƒ^ƒrƒ…ƒA[İ’è
 
 
-
-void APUSoundInstall(void)
+void APUSoundInstall(NEZ_PLAY *pNezPlay)
 {
-	XMEMSET(&apu, 0, sizeof(APUSOUND));
+	APUSOUND *apu;
+	apu = XMALLOC(sizeof(APUSOUND));
+	if (!apu) return;
+	XMEMSET(apu, 0, sizeof(APUSOUND));
+	((NSFNSF*)pNezPlay->nsf)->apu = apu;
 
 	LogTableInitialize();
-	NESAudioHandlerInstall(s_apu_audio_handler);
-	NESVolumeHandlerInstall(s_apu_volume_handler);
-	NESReadHandlerInstall(s_apu_read_handler);
-	NESWriteHandlerInstall(s_apu_write_handler);
-	NESResetHandlerInstall(s_apu_reset_handler);
-	NESResetHandlerInstall(s_apu_reset_handler);
+	NESAudioHandlerInstall(pNezPlay, s_apu_audio_handler);
+	NESVolumeHandlerInstall(pNezPlay, s_apu_volume_handler);
+	NESTerminateHandlerInstall(&pNezPlay->nth, s_apu_terminate_handler);
+	NESReadHandlerInstall(pNezPlay, s_apu_read_handler);
+	NESWriteHandlerInstall(pNezPlay, s_apu_write_handler);
+	NESResetHandlerInstall(pNezPlay->nrh, s_apu_reset_handler);
 
-	//â€šÂ±â€šÂ±â€šÂ©â€šÃ§Æ’Å’Æ’WÆ’XÆ’^Æ’rÆ’â€¦Æ’AÂ[ÂÃâ€™Ã¨
-	regdata_2a03 = apu.regs;
+	//‚±‚±‚©‚çƒŒƒWƒXƒ^ƒrƒ…ƒA[İ’è
+	regdata_2a03 = apu->regs;
 	ioview_ioread_DEV_2A03 = ioview_ioread_bf;
-	//â€šÂ±â€šÂ±â€šÃœâ€šÃ…Æ’Å’Æ’WÆ’XÆ’^Æ’rÆ’â€¦Æ’AÂ[ÂÃâ€™Ã¨
+	//‚±‚±‚Ü‚ÅƒŒƒWƒXƒ^ƒrƒ…ƒA[İ’è
 }

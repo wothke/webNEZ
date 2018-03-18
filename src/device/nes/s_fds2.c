@@ -4,6 +4,7 @@
 #include "format/handler.h"
 #include "format/nsf6502.h"
 #include "logtable.h"
+#include "m_nsf.h"
 #include "s_fds.h"
 
 #define NES_BASECYCLES (21477270)
@@ -44,9 +45,6 @@ typedef struct FDSSOUND {
 	Uint8 reg[0x10];
 	Uint8 waveaddr;
 } FDSSOUND;
-
-
-static FDSSOUND fdssound;
 
 Uint8 NSF_fds_debug_option1 = 1;
 Uint8 NSF_fds_debug_option2 = 0;
@@ -89,40 +87,43 @@ static Int32 FDSSoundOperatorRender(FDS_FMOP *op)
 	return op->ofs3 + ((Int32)op->wave[(op->phase >> 24) & 0x3f] + op->ofs2) * (Int32)op->fd.volume;
 }
 
-static Int32 __fastcall FDSSoundRender(void)
+static Int32 __fastcall FDSSoundRender(void *pNezPlay)
 {
-	fdssound.op[1].input = 0;
-	fdssound.op[0].input = FDSSoundOperatorRender(&fdssound.op[1]) << (11 - fdssound.op[1].lvl);
-	return (FDSSoundOperatorRender(&fdssound.op[0]) << (9 + 2 - fdssound.op[0].lvl));
-
+	FDSSOUND *fdssound = ((NSFNSF*)((NEZ_PLAY*)pNezPlay)->nsf)->fdssound;
+	fdssound->op[1].input = 0;
+	fdssound->op[0].input = FDSSoundOperatorRender(&fdssound->op[1]) << (11 - fdssound->op[1].lvl);
+	return (FDSSoundOperatorRender(&fdssound->op[0]) << (9 + 2 - fdssound->op[0].lvl));
 }
 
-static NES_AUDIO_HANDLER s_fds_audio_handler[] =
+const static NES_AUDIO_HANDLER s_fds_audio_handler[] =
 {
 	{ 1, FDSSoundRender, }, 
 	{ 0, 0, }, 
 };
 
-static void __fastcall FDSSoundVolume(Uint volume)
+static void __fastcall FDSSoundVolume(void *pNezPlay, Uint volume)
 {
-	fdssound.mastervolume = (volume << (LOG_BITS - 8)) << 1;
+	FDSSOUND *fdssound = ((NSFNSF*)((NEZ_PLAY*)pNezPlay)->nsf)->fdssound;
+	fdssound->mastervolume = (volume << (LOG_BITS - 8)) << 1;
 }
+
 const static NES_VOLUME_HANDLER s_fds_volume_handler[] = {
 	{ FDSSoundVolume, }, 
 	{ 0, }, 
 };
 
-static void __fastcall FDSSoundWrite(Uint address, Uint value)
+static void __fastcall FDSSoundWrite(void *pNezPlay, Uint address, Uint value)
 {
+	FDSSOUND *fdssound = ((NSFNSF*)((NEZ_PLAY*)pNezPlay)->nsf)->fdssound;
 	if (0x4040 <= address && address <= 0x407F)
 	{
-		fdssound.op[0].wave[address - 0x4040] = ((Int32)(value & 0x3f)) - 0x20;
+		fdssound->op[0].wave[address - 0x4040] = ((Int32)(value & 0x3f)) - 0x20;
 	}
 	else if (0x4080 <= address && address <= 0x408F)
 	{
 		int ch = (address >= 0x4084);
-		FDS_FMOP *pop = &fdssound.op[ch];
-		fdssound.reg[address - 0x4080] = (Uint8)value;
+		FDS_FMOP *pop = &fdssound->op[ch];
+		fdssound->reg[address - 0x4080] = (Uint8)value;
 		switch (address & 15)
 		{
 			case 0:	case 4:
@@ -171,18 +172,18 @@ static void __fastcall FDSSoundWrite(Uint address, Uint value)
 				{
 					static Int8 lfotbl[8] = { 0,2,4,6,-8,-6,-4,-2 };
 					Int8 v = lfotbl[value & 7];
-					fdssound.op[1].wave[fdssound.waveaddr++] = v;
-					fdssound.op[1].wave[fdssound.waveaddr++] = v;
-					if (fdssound.waveaddr == 0x40) fdssound.waveaddr = 0;
+					fdssound->op[1].wave[fdssound->waveaddr++] = v;
+					fdssound->op[1].wave[fdssound->waveaddr++] = v;
+					if (fdssound->waveaddr == 0x40) fdssound->waveaddr = 0;
 				}
 				break;
 			case 9:
-				fdssound.op[0].lvl = (Uint8)(value & 3);
-				fdssound.op[0].disable2 = (Uint8)(value & 0x80);
+				fdssound->op[0].lvl = (Uint8)(value & 3);
+				fdssound->op[0].disable2 = (Uint8)(value & 0x80);
 				break;
 			case 10:
-				fdssound.op[1].lvl = (Uint8)(value & 3);
-				fdssound.op[1].disable2 = (Uint8)(value & 0x80);
+				fdssound->op[1].lvl = (Uint8)(value & 3);
+				fdssound->op[1].disable2 = (Uint8)(value & 0x80);
 				break;
 		}
 	}
@@ -194,11 +195,12 @@ static NES_WRITE_HANDLER s_fds_write_handler[] =
 	{ 0,      0,      0, },
 };
 
-static Uint __fastcall FDSSoundRead(Uint address)
+static Uint __fastcall FDSSoundRead(void *pNezPlay, Uint address)
 {
+	FDSSOUND *fdssound = ((NSFNSF*)((NEZ_PLAY*)pNezPlay)->nsf)->fdssound;
 	if (0x4090 <= address && address <= 0x409F)
 	{
-		return fdssound.reg[address - 0x4090];
+		return fdssound->reg[address - 0x4090];
 	}
 	return 0;
 }
@@ -227,50 +229,59 @@ static Uint32 DivFix(Uint32 p1, Uint32 p2, Uint32 fix)
 	return ret;
 }
 
-static void __fastcall FDSSoundReset(void)
+static void __fastcall FDSSoundReset(void *pNezPlay)
 {
+	FDSSOUND *fdssound = ((NSFNSF*)((NEZ_PLAY*)pNezPlay)->nsf)->fdssound;
 	Uint32 i, cps, cpf;
 	XMEMSET(&fdssound, 0, sizeof(FDSSOUND));
-	cps = DivFix(NES_BASECYCLES, 12 * NESAudioFrequencyGet(), CPS_BITS);
-	cpf = DivFix(NES_BASECYCLES, 12 * NESAudioFrequencyGet(), CPF_BITS);
-	fdssound.op[0].cps = fdssound.op[1].cps = cps;
-	fdssound.op[0].cpf = fdssound.op[1].cpf = cpf;
-	fdssound.op[0].lvl = fdssound.op[1].lvl = 0;
+	cps = DivFix(NES_BASECYCLES, 12 * NESAudioFrequencyGet(pNezPlay), CPS_BITS);
+	cpf = DivFix(NES_BASECYCLES, 12 * NESAudioFrequencyGet(pNezPlay), CPF_BITS);
+	fdssound->op[0].cps = fdssound->op[1].cps = cps;
+	fdssound->op[0].cpf = fdssound->op[1].cpf = cpf;
+	fdssound->op[0].lvl = fdssound->op[1].lvl = 0;
 #if 0
-	fdssound.op[0].fd.disable = fdssound.op[1].fd.disable = 1;
-	fdssound.op[0].disable = fdssound.op[1].disable = 1;
+	fdssound->op[0].fd.disable = fdssound->op[1].fd.disable = 1;
+	fdssound->op[0].disable = fdssound->op[1].disable = 1;
 #endif
 
 	for (i = 0; i < 0x40; i++)
 	{
-		fdssound.op[0].wave[i] = (i < 0x20) ? 0x1f : -0x20;
-		fdssound.op[1].wave[i] = 0;
+		fdssound->op[0].wave[i] = (i < 0x20) ? 0x1f : -0x20;
+		fdssound->op[1].wave[i] = 0;
 	}
 }
 
-static NES_RESET_HANDLER s_fds_reset_handler[] =
+const static NES_RESET_HANDLER s_fds_reset_handler[] =
 {
 	{ NES_RESET_SYS_NOMAL, FDSSoundReset, }, 
 	{ 0,                   0, }, 
 };
 
-static void __fastcall FDSSoundTerm(void)
+static void __fastcall FDSSoundTerm(void* pNezPlay)
 {
+	FDSSOUND *fdssound = ((NSFNSF*)((NEZ_PLAY*)pNezPlay)->nsf)->fdssound;
+	if (fdssound)
+		XFREE(fdssound);
 }
 
-static NES_TERMINATE_HANDLER s_fds_terminate_handler[] = {
+const static NES_TERMINATE_HANDLER s_fds_terminate_handler[] = {
 	{ FDSSoundTerm, }, 
 	{ 0, }, 
 };
 
-void FDSSoundInstall2(void)
+void FDSSoundInstall2(NEZ_PLAY *pNezPlay)
 {
-	XMEMSET(&fdssound, 0, sizeof(FDSSOUND));
+	FDSSOUND *fdssound;
+	fdssound = XMALLOC(sizeof(FDSSOUND));
+	if (!fdssound) return;
+	XMEMSET(fdssound, 0, sizeof(FDSSOUND));
+	((NSFNSF*)pNezPlay->nsf)->fdssound = fdssound;
+
 	LogTableInitialize();
-	NESAudioHandlerInstall(s_fds_audio_handler);
-	NESVolumeHandlerInstall(s_fds_volume_handler);
-	NESReadHandlerInstall(s_fds_read_handler);
-	NESWriteHandlerInstall(s_fds_write_handler);
-	NESResetHandlerInstall(s_fds_reset_handler);
-	NESResetHandlerInstall(s_fds_reset_handler);
+	NESAudioHandlerInstall(pNezPlay, s_fds_audio_handler);
+	NESVolumeHandlerInstall(pNezPlay, s_fds_volume_handler);
+	NESTerminateHandlerInstall(&pNezPlay->nth, s_fds_terminate_handler);
+	NESReadHandlerInstall(pNezPlay, s_fds_read_handler);
+	NESWriteHandlerInstall(pNezPlay, s_fds_write_handler);
+	NESResetHandlerInstall(pNezPlay->nrh, s_fds_reset_handler);
 }

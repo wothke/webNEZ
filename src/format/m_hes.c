@@ -77,7 +77,6 @@ struct  HESHES_TAG {
 	Uint8 hesvdc_ADR;
 };
 
-HESHES *heshes= 0;
 
 struct {
 	char* title;
@@ -134,9 +133,8 @@ static Uint32 km6280_exec(struct K6280_Context *ctx, Uint32 cycles)
 	return kmecycle;
 }
 
-static Int32 execute()
+static Int32 execute(HESHES *THIS_)
 {
-	HESHES *THIS_= heshes;
 	Uint32 cycles;
 	THIS_->cpsrem += THIS_->cps;
 	cycles = THIS_->cpsrem >> SHIFT_CPS;
@@ -152,30 +150,26 @@ static Int32 execute()
 	return 0;
 }
 
-static void synth(Int32 *d)
+__inline static void synth(HESHES *THIS_, Int32 *d)
 {
-	HESHES *THIS_= heshes;
 	THIS_->hessnd->synth(THIS_->hessnd->ctx, d);
 	THIS_->hespcm->synth(THIS_->hespcm->ctx, d);
 }
 
-static void volume(Uint32 v)
+__inline static void volume(HESHES *THIS_, Uint32 v)
 {
-	HESHES *THIS_= heshes;
 	THIS_->hessnd->volume(THIS_->hessnd->ctx, v);
 	THIS_->hespcm->volume(THIS_->hespcm->ctx, v);
 }
 
 
-static void vsync_setup()
+static void vsync_setup(HESHES *THIS_)
 {
-	HESHES *THIS_= heshes;
 	kmevent_settimer(&THIS_->kme, THIS_->vsync, 4 * 342 * 262);
 }
 
-static void timer_setup()
+static void timer_setup(HESHES *THIS_)
 {
-	HESHES *THIS_= heshes;
 	kmevent_settimer(&THIS_->kme, THIS_->timer, HES_TIMERCYCLES);
 }
 
@@ -204,12 +198,12 @@ static Uint32 read_6270(HESHES *THIS_, Uint32 a)
 	Uint32 v = 0;
 	if (a == 0)
 	{
-		if (heshes->hesvdc_STATUS)
+		if (THIS_->hesvdc_STATUS)
 		{
-			heshes->hesvdc_STATUS = 0;
+			THIS_->hesvdc_STATUS = 0;
 			v = 0x20;
 		}
-		heshes->ctx.iRequest &= ~K6280_INT1;
+		THIS_->ctx.iRequest &= ~K6280_INT1;
 #if 0
 		v = 0x20;	/* 常にVSYNC期間 */
 #endif
@@ -416,7 +410,7 @@ Uint32 memview_memread_hes(Uint32 a){
 //ここまでメモリービュアー設定
 
 //ここからダンプ設定
-//static NEZ_PLAY *pNezPlayDump;
+static NEZ_PLAY *pNezPlayDump;
 Uint32 (*dump_MEM_PCE)(Uint32 a,unsigned char* mem);
 static Uint32 dump_MEM_PCE_bf(Uint32 menu,unsigned char* mem){
 	int i;
@@ -485,11 +479,11 @@ static Uint32 dump_DEV_ADPCM_bf(Uint32 menu,unsigned char* mem){
 }
 //----------
 
-static void reset()
+static void reset(NEZ_PLAY *pNezPlay)
 {
-	HESHES *THIS_ = heshes;
+	HESHES *THIS_ = pNezPlay->heshes;
 	Uint32 i, initbreak;
-	Uint32 freq = NESAudioFrequencyGet();
+	Uint32 freq = NESAudioFrequencyGet(pNezPlay);
 
 	THIS_->hessnd->reset(THIS_->hessnd->ctx, HES_BASECYCLES, freq);
 	THIS_->hespcm->reset(THIS_->hespcm->ctx, HES_BASECYCLES, freq);
@@ -518,7 +512,7 @@ static void reset()
 	THIS_->breaked = 0;
 	THIS_->cpsrem = THIS_->cpsgap = THIS_->total_cycles = 0;
 
-	THIS_->ctx.A = (SONGINFO_GetSongNo() - 1) & 0xff;
+	THIS_->ctx.A = (SONGINFO_GetSongNo(pNezPlay->song) - 1) & 0xff;
 	THIS_->ctx.P = K6280_Z_FLAG + K6280_I_FLAG;
 	THIS_->ctx.X = THIS_->ctx.Y = 0;
 	THIS_->ctx.S = 0xFF;
@@ -564,7 +558,7 @@ static void reset()
 	//ここまでメモリービュアー設定
 
 	//ここからダンプ設定
-//	pNezPlayDump = pNezPlay;
+	pNezPlayDump = pNezPlay;
 	dump_MEM_PCE     = dump_MEM_PCE_bf;
 	dump_DEV_HUC6230 = dump_DEV_HUC6230_bf;
 	dump_DEV_ADPCM   = dump_DEV_ADPCM_bf;
@@ -572,9 +566,8 @@ static void reset()
 
 }
 
-static void terminate()
+static void terminate(HESHES *THIS_)
 {
-	HESHES *THIS_= heshes;
 	Uint32 i;
 
 	//ここからダンプ設定
@@ -587,7 +580,6 @@ static void terminate()
 	if (THIS_->hespcm) THIS_->hespcm->release(THIS_->hespcm->ctx);
 	for (i = 0; i < 0x100; i++) if (THIS_->memmap[i]) XFREE(THIS_->memmap[i]);
 	XFREE(THIS_);
-	heshes= 0;
 }
 
 static Uint32 GetWordLE(Uint8 *p)
@@ -638,7 +630,7 @@ static void copy_physical_address(HESHES *THIS_, Uint32 a, Uint32 l, Uint8 *p)
 }
 
 
-static Uint32 load(HESHES *THIS_, Uint8 *pData, Uint32 uSize)
+static Uint32 load(NEZ_PLAY *pNezPlay, HESHES *THIS_, Uint8 *pData, Uint32 uSize)
 {
 	Uint32 i, p;
 	XMEMSET(THIS_, 0, sizeof(HESHES));
@@ -647,16 +639,16 @@ static Uint32 load(HESHES *THIS_, Uint8 *pData, Uint32 uSize)
 	for (i = 0; i < 0x100; i++) THIS_->memmap[i] = 0;
 
 	if (uSize < 0x20) return NESERR_FORMAT;
-	SONGINFO_SetStartSongNo(pData[5] + 1);
-	SONGINFO_SetMaxSongNo(256);
-	SONGINFO_SetChannel(2);
-	SONGINFO_SetExtendDevice(0);
+	SONGINFO_SetStartSongNo(pNezPlay->song, pData[5] + 1);
+	SONGINFO_SetMaxSongNo(pNezPlay->song, 256);
+	SONGINFO_SetChannel(pNezPlay->song, 2);
+	SONGINFO_SetExtendDevice(pNezPlay->song, 0);
 	for (i = 0; i < 8; i++) THIS_->firstmpr[i] = pData[8 + i];
 	THIS_->playerromaddr = 0x1ff0;
 	THIS_->initaddr = GetWordLE(pData + 0x06);
-	SONGINFO_SetInitAddress(THIS_->initaddr);
-	SONGINFO_SetPlayAddress(0);
-/*
+	SONGINFO_SetInitAddress(pNezPlay->song, THIS_->initaddr);
+	SONGINFO_SetPlayAddress(pNezPlay->song, 0);
+
 	sprintf(songinfodata.detail,
 "Type           : HES\r\n\
 Start Song     : %02XH\r\n\
@@ -679,7 +671,7 @@ First Mapper 7 : %02XH"
 		,pData[0xe]
 		,pData[0xf]
 		);
-*/
+
 	if (!alloc_physical_address(THIS_, 0xf8 << 13, 0x2000))	/* RAM */
 		return NESERR_SHORTOFMEMORY;
 	if (!alloc_physical_address(THIS_, 0xf9 << 13, 0x2000))	/* SGX-RAM */
@@ -711,20 +703,21 @@ First Mapper 7 : %02XH"
 
 }
 
-static Int32 __fastcall ExecuteHES()
+
+static Int32 __fastcall ExecuteHES(void *pNezPlay)
 {
-	return heshes ? execute() : 0;
+	return ((NEZ_PLAY*)pNezPlay)->heshes ? execute((HESHES*)((NEZ_PLAY*)pNezPlay)->heshes) : 0;
 }
 
-static void __fastcall HESSoundRenderStereo(Int32 *d)
+static void __fastcall HESSoundRenderStereo(void *pNezPlay, Int32 *d)
 {
-	synth(d);
+	synth((HESHES*)((NEZ_PLAY*)pNezPlay)->heshes, d);
 }
 
-static Int32 __fastcall HESSoundRenderMono()
+static Int32 __fastcall HESSoundRenderMono(void *pNezPlay)
 {
 	Int32 d[2] = { 0,0 } ;
-	synth(d);
+	synth((HESHES*)((NEZ_PLAY*)pNezPlay)->heshes, d);
 #if (((-1) >> 1) == -1)
 	return (d[0] + d[1]) >> 1;
 #else
@@ -738,11 +731,11 @@ const static NES_AUDIO_HANDLER heshes_audio_handler[] = {
 	{ 0, 0, 0, },
 };
 
-static void __fastcall HESHESVolume(Uint32 v)
+static void __fastcall HESHESVolume(void *pNezPlay, Uint32 v)
 {
-	if (heshes)
+	if (((NEZ_PLAY*)pNezPlay)->heshes)
 	{
-		volume(v);
+		volume((HESHES*)((NEZ_PLAY*)pNezPlay)->heshes, v);
 	}
 }
 
@@ -751,9 +744,9 @@ const static NES_VOLUME_HANDLER heshes_volume_handler[] = {
 	{ 0, }, 
 };
 
-static void __fastcall HESHESReset()
+static void __fastcall HESHESReset(void *pNezPlay)
 {
-	if (heshes) reset();
+	if (((NEZ_PLAY*)pNezPlay)->heshes) reset((NEZ_PLAY*)pNezPlay);
 }
 
 const static NES_RESET_HANDLER heshes_reset_handler[] = {
@@ -761,11 +754,12 @@ const static NES_RESET_HANDLER heshes_reset_handler[] = {
 	{ 0,                  0, },
 };
 
-static void __fastcall HESHESTerminate()
+static void __fastcall HESHESTerminate(void *pNezPlay)
 {
-	if (heshes)
+	if (((NEZ_PLAY*)pNezPlay)->heshes)
 	{
-		terminate(heshes);
+		terminate((HESHES*)((NEZ_PLAY*)pNezPlay)->heshes);
+		((NEZ_PLAY*)pNezPlay)->heshes = 0;
 	}
 }
 
@@ -774,23 +768,23 @@ const static NES_TERMINATE_HANDLER heshes_terminate_handler[] = {
 	{ 0, },
 };
 
-Uint32 HESLoad(Uint8 *pData, Uint32 uSize)
+Uint32 HESLoad(NEZ_PLAY *pNezPlay, Uint8 *pData, Uint32 uSize)
 {
 	Uint32 ret;
 	HESHES *THIS_;
 
 	THIS_ = (HESHES *)XMALLOC(sizeof(HESHES));
 	if (!THIS_) return NESERR_SHORTOFMEMORY;
-	ret = load(THIS_, pData, uSize);
+	ret = load(pNezPlay, THIS_, pData, uSize);
 	if (ret)
 	{
 		terminate(THIS_);
 		return ret;
 	}
-	heshes = THIS_;
-	NESAudioHandlerInstall(heshes_audio_handler);
-	NESVolumeHandlerInstall(heshes_volume_handler);
-	NESResetHandlerInstall(heshes_reset_handler);
-	NESTerminateHandlerInstall(heshes_terminate_handler);
+	pNezPlay->heshes = THIS_;
+	NESAudioHandlerInstall(pNezPlay, heshes_audio_handler);
+	NESVolumeHandlerInstall(pNezPlay, heshes_volume_handler);
+	NESResetHandlerInstall(pNezPlay->nrh, heshes_reset_handler);
+	NESTerminateHandlerInstall(&pNezPlay->nth, heshes_terminate_handler);
 	return ret;
 }

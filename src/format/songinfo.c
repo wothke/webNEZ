@@ -1,147 +1,120 @@
 #include "songinfo.h"
 
-static struct
-{
-	Uint songno;
-	Uint maxsongno;
-	Uint startsongno;
-	Uint extdevice;
-	Uint initaddress;
-	Uint playaddress;
-	Uint channel;
-	Uint initlimit;
-    Uint isnsf;
-    
-    char title[128];
-	
-	// hm.. nezplay is not even using these...
-    char artist[128];	
-    char copyright[128];
-} local = {
-	0,0,0,0,0,0,1,0,
-    0, // isnsf
-    "",
-    "",
-    ""
-};
+Int32 Always_stereo = 0;
 
-Uint SONGINFO_GetSongNo(void)
+SONG_INFO* SONGINFO_New()
 {
-	return local.songno;
+	SONG_INFO *info = (SONG_INFO*)malloc(sizeof(SONG_INFO));
+
+	if (info != NULL) {
+		info->songno = 1;
+		info->maxsongno = info->startsongno = 0;
+		info->extdevice = 0;
+		info->initaddress = info->playaddress = 0;
+		info->channel = 1;
+		info->initlimit = 0;
+	}
+
+	return info;
 }
-void SONGINFO_SetSongNo(Uint v)
+
+void SONGINFO_Delete(SONG_INFO *info)
 {
-	if (local.maxsongno && v > local.maxsongno) v = local.maxsongno;
+	free (info);
+}
+
+Uint SONGINFO_GetSongNo(SONG_INFO *info)
+{
+	return info->songno;
+}
+void SONGINFO_SetSongNo(SONG_INFO *info, Uint v)
+{
+	if (info->maxsongno && v > info->maxsongno) v = info->maxsongno;
 	if (v == 0) v++;
-	local.songno = v;
+	info->songno = v;
 }
-Uint SONGINFO_GetStartSongNo(void)
+Uint SONGINFO_GetStartSongNo(SONG_INFO *info)
 {
-	return local.startsongno;
+	return info->startsongno;
 }
-void SONGINFO_SetStartSongNo(Uint v)
+void SONGINFO_SetStartSongNo(SONG_INFO *info, Uint v)
 {
-	local.startsongno = v;
+	info->startsongno = v;
 }
-Uint SONGINFO_GetMaxSongNo(void)
+Uint SONGINFO_GetMaxSongNo(SONG_INFO *info)
 {
-	return local.maxsongno;
+	return info->maxsongno;
 }
-void SONGINFO_SetMaxSongNo(Uint v)
+void SONGINFO_SetMaxSongNo(SONG_INFO* info, Uint v)
 {
-	local.maxsongno = v;
+	info->maxsongno = v;
 }
-Uint SONGINFO_GetExtendDevice(void)
+Uint SONGINFO_GetExtendDevice(SONG_INFO *info)
 {
-	return local.extdevice;
+	return info->extdevice;
 }
-void SONGINFO_SetExtendDevice(Uint v)
+void SONGINFO_SetExtendDevice(SONG_INFO *info, Uint v)
 {
-	local.extdevice = v;
+	info->extdevice = v;
 }
-Uint SONGINFO_GetInitAddress(void)
+Uint SONGINFO_GetInitAddress(SONG_INFO *info)
 {
-	return local.initaddress;
+	return info->initaddress;
 }
-void SONGINFO_SetInitAddress(Uint v)
+void SONGINFO_SetInitAddress(SONG_INFO *info, Uint v)
 {
-	local.initaddress = v;
+	info->initaddress = v;
 }
-Uint SONGINFO_GetPlayAddress(void)
+Uint SONGINFO_GetPlayAddress(SONG_INFO *info)
 {
-	return local.playaddress;
+	return info->playaddress;
 }
-void SONGINFO_SetPlayAddress(Uint v)
+void SONGINFO_SetPlayAddress(SONG_INFO *info, Uint v)
 {
-	local.playaddress = v;
+	info->playaddress = v;
 }
-Uint SONGINFO_GetChannel(void)
+Uint SONGINFO_GetChannel(SONG_INFO *info)
 {
-	return local.channel;
+	return info->channel;
 }
-void SONGINFO_SetChannel(Uint v)
+void SONGINFO_SetChannel(SONG_INFO *info, Uint v)
 {
-	local.channel = v;
+	if(Always_stereo)
+		info->channel = 2;
+	else
+		info->channel = v;
+
+}
+void SONGINFO_SetTitle(SONG_INFO *info,const char *title)
+{
+    strcpy(info->title, title);
 }
 
-Uint SONGINFO_GetInitializeLimiter(void)
+char *SONGINFO_GetTitle(SONG_INFO *info)
 {
-	return local.initlimit;
-}
-void SONGINFO_SetInitializeLimiter(Uint v)
-{
-	local.initlimit = v;
+    return info->title;
 }
 
-void SONGINFO_SetTitle(const char *title)
+void SONGINFO_SetArtist(SONG_INFO *info,const char *artist)
 {
-    strcpy(local.title, title);
+    strcpy(info->artist, artist);
 }
 
-char *SONGINFO_GetTitle(void)
+char *SONGINFO_GetArtist(SONG_INFO *info)
 {
-    return local.title;
+    return info->artist;
+}
+void SONGINFO_SetCopyright(SONG_INFO *info,const char *copyright)
+{
+    strcpy(info->copyright, copyright);
 }
 
-void SONGINFO_SetArtist(const char *artist)
+char *SONGINFO_GetCopyright(SONG_INFO *info)
 {
-    strcpy(local.artist, artist);
+    return info->copyright;
 }
-
-char *SONGINFO_GetArtist(void)
-{
-    return local.artist;
-}
-void SONGINFO_SetCopyright(const char *copyright)
-{
-    strcpy(local.copyright, copyright);
-}
-
-char *SONGINFO_GetCopyright(void)
-{
-    return local.copyright;
-}
-
-void SONGINFO_Reset(void) {
-	local.songno= 0;
-	local.maxsongno= 0;
-	local.startsongno= 0;
-	local.extdevice= 0;
-	local.initaddress= 0;
-	local.playaddress= 0;
-	local.channel= 0;
-	local.initlimit= 0;
-    local.isnsf= 0;
-	SONGINFO_SetTitle("");
-	SONGINFO_SetArtist("");
-	SONGINFO_SetCopyright("");
-}
-
-Uint SONGINFO_GetNSFflag(void)
-{
-	return local.isnsf;
-}
-void SONGINFO_SetNSFflag(Uint v)
-{
-	local.isnsf = v;
+void SONGINFO_Reset(SONG_INFO *info) {
+	SONGINFO_SetTitle(info, "");
+	SONGINFO_SetArtist(info, "");
+	SONGINFO_SetCopyright(info, "");
 }

@@ -14,7 +14,7 @@ enum {
 	/* PCE-ADPCM   */ MSM5205
 };
 
-KMIF_SOUND_DEVICE *YMDELTATPCMSoundAlloc(Uint32 ymdeltatpcm_type, Uint8 *pcmbuf);
+KMIF_SOUND_DEVICE *YMDELTATPCMSoundAlloc(Uint32 ymdeltatpcm_type , Uint8 *pcmbuf);
 
 #ifdef __cplusplus
 }

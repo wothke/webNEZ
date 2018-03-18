@@ -7,7 +7,7 @@
 extern "C" {
 #endif
 
-Uint32 GBRLoad(Uint8 *pData, Uint32 uSize);
+Uint32 GBRLoad(NEZ_PLAY*, Uint8 *pData, Uint32 uSize);
 
 #ifdef __cplusplus
 }

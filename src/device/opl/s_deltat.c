@@ -42,7 +42,7 @@ typedef struct {
 
 const static Int8 table_step[16] =
 {
-	  1,   3,   5,   7,   9,  11,  13,  15,
+	1,	3,	5,	7,	9,	11,	13,	15,
 	-1,	-1,	-1,	-1,	2,	4,	6,	8
 };
 const static Uint8 table_scale[16] =
@@ -103,19 +103,16 @@ const static Int32 scaletable[49*16]={
   194,  582,  970, 1358, 1746, 2134, 2522, 2910, -194, -582, -970,-1358,-1746,-2134,-2522,-2910
 };
 
-__inline static void writeram(void *p, Uint32 v)
-{
-	YMDELTATPCMSOUND *sndp = p;
 
+__inline static void writeram(YMDELTATPCMSOUND *sndp, Uint32 v)
+{
 	sndp->rambuf[(sndp->common.mem >> 1) & sndp->rammask] = (Uint8)v;
 	sndp->common.mem += 1 << 1;
 }
 
-__inline static Uint32 readram(void *p)
+__inline static Uint32 readram(YMDELTATPCMSOUND *sndp)
 {
 	Uint32 v;
-	YMDELTATPCMSOUND *sndp = p;
-
 	v = sndp->romrambuf[(sndp->common.play >> 1) & sndp->romrammask];
 	if (sndp->common.play & 1)
 		v &= 0x0f;
@@ -131,8 +128,8 @@ __inline static Uint32 readram(void *p)
 			if(sndp->ymdeltatpcm_type==MSM5205){
 				sndp->common.scale = 0;
 			}else{
-			sndp->common.scale = 127;
-		}
+				sndp->common.scale = 127;
+			}
 		}
 		else
 		{
@@ -142,9 +139,8 @@ __inline static Uint32 readram(void *p)
 	return v;
 }
 
-__inline static void DelrtatStep(void *p, Uint32 data)
+__inline static void DelrtatStep(YMDELTATPCMSOUND *sndp, Uint32 data)
 {
-	YMDELTATPCMSOUND *sndp = p;
 	if(sndp->ymdeltatpcm_type==MSM5205){
 		sndp->common.scale = sndp->common.scale + scaletable[(sndp->common.step << 4) + (data & 0xf)];
 		if (sndp->common.scale >  2047) sndp->common.scale = 2047;
@@ -172,10 +168,9 @@ __inline static void DelrtatStep(void *p, Uint32 data)
 #define SSR(x, y) (((x) >= 0) ? ((x) >> (y)) : (-((-(x) - 1) >> (y)) - 1))
 #endif
 
-static void sndsynth(void *sp, Int32 *p)
-{
-	YMDELTATPCMSOUND *sndp = sp;
 
+static void sndsynth(YMDELTATPCMSOUND *sndp, Int32 *p)
+{
 	if (sndp->common.key)
 	{
 		Uint32 step;
@@ -194,23 +189,21 @@ static void sndsynth(void *sp, Int32 *p)
 			if(sndp->ymdeltatpcm_type==MSM5205){
 				sndp->common.output = sndp->common.scale * sndp->common.level32;
 			}else{
-			sndp->common.output = sndp->common.step * sndp->common.level32;
+				sndp->common.output = sndp->common.step * sndp->common.level32;
 			}
 			sndp->common.output = SSR(sndp->common.output, 8 + 2);
 		}
 		if(chmask[DEV_ADPCM_CH1]){
-		p[0] += sndp->common.output;
-		p[1] += sndp->common.output;
+			p[0] += sndp->common.output;
+			p[1] += sndp->common.output;
+		}
 	}
 }
-}
 
 
 
-static void sndwrite(void *p, Uint32 a, Uint32 v)
+static void sndwrite(YMDELTATPCMSOUND *sndp, Uint32 a, Uint32 v)
 {
-	YMDELTATPCMSOUND *sndp = p;
-
 	sndp->common.regs[a] = (Uint8)v;
 	switch (a)
 	{
@@ -224,8 +217,8 @@ static void sndwrite(void *p, Uint32 a, Uint32 v)
 				if(sndp->ymdeltatpcm_type==MSM5205){
 					sndp->common.scale = 0;
 				}else{
-				sndp->common.scale = 127;
-			}
+					sndp->common.scale = 127;
+				}
 			}
 			if (v & 1) sndp->common.key = 0;
 			break;
@@ -261,22 +254,20 @@ static void sndwrite(void *p, Uint32 a, Uint32 v)
 			if(sndp->ymdeltatpcm_type==MSM5205){
 				sndp->common.output = sndp->common.scale * sndp->common.level32;
 			}else{
-			sndp->common.output = sndp->common.step * sndp->common.level32;
+				sndp->common.output = sndp->common.step * sndp->common.level32;
 			}
 			sndp->common.output = SSR(sndp->common.output, 8 + 2);
 			break;
 	}
 }
 
-static Uint32 sndread(void *p, Uint32 a)
+static Uint32 sndread(YMDELTATPCMSOUND *sndp, Uint32 a)
 {
 	return 0;
 }
 
-static void sndreset(void *p, Uint32 clock, Uint32 freq)
+static void sndreset(YMDELTATPCMSOUND *sndp, Uint32 clock, Uint32 freq)
 {
-	YMDELTATPCMSOUND *sndp = p;
-
 	XMEMSET(&sndp->common, 0, sizeof(sndp->common));
 	sndp->common.cps = DivFix(clock, 72 * freq, CPS_SHIFT);
 	sndp->romrambuf  = (sndp->common.regs[1] & 1) ? sndp->rombuf  : sndp->rambuf;
@@ -284,10 +275,8 @@ static void sndreset(void *p, Uint32 clock, Uint32 freq)
 	sndp->common.granuality = 4;
 }
 
-static void sndvolume(void *p, Int32 volume)
+static void sndvolume(YMDELTATPCMSOUND *sndp, Int32 volume)
 {
-	YMDELTATPCMSOUND *sndp = p;
-
 	volume = (volume << (LOG_BITS - 8)) << 1;
 	sndp->common.mastervolume = volume;
 	sndp->common.level32 = ((Int32)(sndp->common.level * LogToLin(sndp->logtbl, sndp->common.mastervolume, LOG_LIN_BITS - 15))) >> 7;
@@ -295,17 +284,16 @@ static void sndvolume(void *p, Int32 volume)
 	sndp->common.output = SSR(sndp->common.output, 8 + 2);
 }
 
-static void sndrelease(void *p)
+static void sndrelease(YMDELTATPCMSOUND *sndp)
 {
-	YMDELTATPCMSOUND *sndp = p;
-	if (sndp->logtbl) sndp->logtbl->release(sndp->logtbl->ctx);
-	XFREE(sndp);
+	if (sndp) {
+		if (sndp->logtbl) sndp->logtbl->release(sndp->logtbl->ctx);
+		XFREE(sndp);
+	}
 }
 
-static void setinst(void *sp, Uint32 n, void *p, Uint32 l)
+static void setinst(YMDELTATPCMSOUND *sndp, Uint32 n, void *p, Uint32 l)
 {
-	YMDELTATPCMSOUND *sndp = sp;
-
 	if (n) return;
 	if (p)
 	{
@@ -384,7 +372,7 @@ KMIF_SOUND_DEVICE *YMDELTATPCMSoundAlloc(Uint32 ymdeltatpcm_type , Uint8 *pcmbuf
 	if(pcmbuf != NULL)
 		sndp->rambuf = pcmbuf;
 	else
-	sndp->rambuf = ram_size ? (Uint8 *)(sndp + 1) : 0;
+		sndp->rambuf = ram_size ? (Uint8 *)(sndp + 1) : 0;
 	sndp->rammask = ram_size ? (ram_size - 1) : 0;
 	/* ROM */
 	sndp->rombuf = 0;

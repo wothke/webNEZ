@@ -572,9 +572,10 @@ static void write_event(void *ctx, Uint32 a, Uint32 v)
 
 static void vsync_event(KMEVENT *event, KMEVENT_ITEM_ID curid, GBRDMG *THIS_)
 {
+
 	vsync_setup(THIS_);
-		THIS_->gb_IF |= 1;
-		THIS_->ctx.regs8[REGID_INTREQ] |= 1;
+	THIS_->gb_IF |= 1;
+	THIS_->ctx.regs8[REGID_INTREQ] |= 1;
 	//---+ [changes_rough.txt]
 	if (THIS_->useINT) THIS_->ctx.playflag |= 0x41;
 	//---+
@@ -582,14 +583,14 @@ static void vsync_event(KMEVENT *event, KMEVENT_ITEM_ID curid, GBRDMG *THIS_)
 	{
 	}//else
 	//	vsync_setup2(THIS_);
-	}
+}
 
 static void timer_event(KMEVENT *event, KMEVENT_ITEM_ID curid, GBRDMG *THIS_)
 {
 	THIS_->gb_TIMA = THIS_->gb_TMA;
 	timer_setup(THIS_);
-		THIS_->gb_IF |= 4;
-		THIS_->ctx.regs8[REGID_INTREQ] |= 4;
+	THIS_->gb_IF |= 4;
+	THIS_->ctx.regs8[REGID_INTREQ] |= 4;
 	//---+ [changes_rough.txt]
 	if (THIS_->useINT) THIS_->ctx.playflag |= 0x44;
 	//---+
@@ -598,17 +599,17 @@ static void timer_event(KMEVENT *event, KMEVENT_ITEM_ID curid, GBRDMG *THIS_)
 	}//else
 	//	timer_setup2(THIS_);
 
-	}
+}
 
 //ここからダンプ設定
-//static NEZ_PLAY *pNezPlayDump;
+static NEZ_PLAY *pNezPlayDump;
 Uint32 (*dump_MEM_GB)(Uint32 a,unsigned char* mem);
 static Uint32 dump_MEM_GB_bf(Uint32 menu,unsigned char* mem){
 	int i;
 	switch(menu){
 	case 1://Memory
-//		for(i=0;i<0x10000;i++)
-//			mem[i] = read_event(pNezPlayDump->gbrdmg,i);
+		for(i=0;i<0x10000;i++)
+			mem[i] = read_event(pNezPlayDump->gbrdmg,i);
 		return i;
 	}
 	return -2;
@@ -629,17 +630,18 @@ static Uint32 dump_DEV_DMG_bf(Uint32 menu,unsigned char* mem){
 		for(i=0;i<0x10;i++)
 			mem[i] = gb_regdata[i+0x20];
 		return i;
-}
+	}
 	return -2;
 }
 //----------
 
 
-static void reset(GBRDMG *THIS_)
+static void reset(NEZ_PLAY *pNezPlay)
 {
+	GBRDMG *THIS_ = pNezPlay->gbrdmg;
 	Uint32 song, initbreak;
-	Uint32 freq = NESAudioFrequencyGet();
-	song = SONGINFO_GetSongNo() - 1;
+	Uint32 freq = NESAudioFrequencyGet(pNezPlay);
+	song = SONGINFO_GetSongNo(pNezPlay->song) - 1;
 	if (song >= THIS_->maxsong) song = THIS_->startsong - 1;
 
 	THIS_->playerromioaddr = 0x9fc0;
@@ -833,22 +835,20 @@ static void reset(GBRDMG *THIS_)
 	/* THIS_->gb_IE = THIS_->timerflag; */
 
 	THIS_->total_cycles = 0;
-/*
+
 	//ここからダンプ設定
 	pNezPlayDump = pNezPlay;
 	dump_MEM_GB  = dump_MEM_GB_bf;
 	dump_DEV_DMG = dump_DEV_DMG_bf;
 	//ここまでダンプ設定
-*/
+
 }
 
 static void terminate(GBRDMG *THIS_)
 {
-/*
 	//ここからダンプ設定
 	dump_MEM_GB  = NULL;
 	dump_DEV_DMG = NULL;
-*/
 	//ここまでダンプ設定
 	if (THIS_->dmgsnd) THIS_->dmgsnd->release(THIS_->dmgsnd->ctx);
 	if (THIS_->bankrom) XFREE(THIS_->bankrom);
@@ -860,8 +860,9 @@ static Uint32 GetWordLE(Uint8 *p)
 	return p[0] | (p[1] << 8);
 }
 
-static Uint32 load(GBRDMG *THIS_, Uint8 *pData, Uint32 uSize)
+static Uint32 load(NEZ_PLAY *pNezPlay, GBRDMG *THIS_, Uint8 *pData, Uint32 uSize)
 {
+
 	XMEMSET(THIS_, 0, sizeof(GBRDMG));
 	THIS_->dmgsnd = 0;
 	THIS_->bankrom = 0;
@@ -881,8 +882,8 @@ static Uint32 load(GBRDMG *THIS_, Uint8 *pData, Uint32 uSize)
 		if (uSize < 0x20) return NESERR_FORMAT;
 		THIS_->maxsong = 256;
 		THIS_->startsong = 1;
-		SONGINFO_SetStartSongNo(THIS_->startsong);
-		SONGINFO_SetMaxSongNo(THIS_->maxsong);
+		SONGINFO_SetStartSongNo(pNezPlay->song, THIS_->startsong);
+		SONGINFO_SetMaxSongNo(pNezPlay->song, THIS_->maxsong);
 		THIS_->bankromnum = pData[4];
 		if (!THIS_->bankromnum) return NESERR_FORMAT;
 		THIS_->bankromfirst[0] = pData[5];
@@ -915,16 +916,15 @@ static Uint32 load(GBRDMG *THIS_, Uint8 *pData, Uint32 uSize)
 		XMEMSET(THIS_->titlebuffer, 0, 0x21);
 		XMEMCPY(THIS_->titlebuffer, pData + 0x0134, 0x10);
 		songinfodata.title=THIS_->titlebuffer;
-		SONGINFO_SetTitle(songinfodata.title);
+		SONGINFO_SetTitle(pNezPlay->song, songinfodata.title);
 
 		XMEMSET(THIS_->artistbuffer, 0, 0x21);
 		songinfodata.artist=THIS_->artistbuffer;
-		SONGINFO_SetArtist(songinfodata.artist);
+		SONGINFO_SetArtist(pNezPlay->song, songinfodata.artist);
 
 		XMEMSET(THIS_->copyrightbuffer, 0, 0x21);
 		songinfodata.copyright=THIS_->copyrightbuffer;
-		SONGINFO_SetCopyright(songinfodata.copyright);
-/*
+		SONGINFO_SetCopyright(pNezPlay->song, songinfodata.copyright);
 		sprintf(songinfodata.detail,
 "Type               : GBRF\r\n\
 Bank ROM Num       : %XH\r\n\
@@ -941,7 +941,7 @@ First TMC          : %02XH"
 			,THIS_->vsyncaddr,THIS_->timeraddr
 			,(THIS_->timerflag&1) ? "VSync " : "" , (THIS_->timerflag>>2) ? "Timer " : ""
 			,THIS_->isCGB,THIS_->firstTMA,THIS_->firstTMC);
-*/		
+		
 	}
 	else
 	{
@@ -949,8 +949,8 @@ First TMC          : %02XH"
 		if (uSize < 0x70) return NESERR_FORMAT;
 		THIS_->maxsong = pData[0x04];
 		THIS_->startsong = pData[0x05];
-		SONGINFO_SetStartSongNo(THIS_->startsong);
-		SONGINFO_SetMaxSongNo(THIS_->maxsong);
+		SONGINFO_SetStartSongNo(pNezPlay->song, THIS_->startsong);
+		SONGINFO_SetMaxSongNo(pNezPlay->song, THIS_->maxsong);
 		THIS_->bankromfirst[0] = 0;
 		THIS_->bankromfirst[1] = 1;
 		THIS_->loadaddr = GetWordLE(pData + 0x06);
@@ -977,7 +977,7 @@ First TMC          : %02XH"
 			THIS_->playaddr = GetWordLE(pData + 0x0a);
 		}
 		else{
-		THIS_->timerflag = (pData[0x0f] & 4) ? 4 : 1;
+			THIS_->timerflag = (pData[0x0f] & 4) ? 4 : 1;
 			THIS_->vsyncaddr = (pData[0x0f] & 4) ? 0x9fc9 : GetWordLE(pData + 0x0a);
 			THIS_->timeraddr = (pData[0x0f] & 4) ? GetWordLE(pData + 0x0a) : 0x9fc9;
 		}
@@ -991,18 +991,17 @@ First TMC          : %02XH"
 		XMEMSET(THIS_->titlebuffer, 0, 0x21);
 		XMEMCPY(THIS_->titlebuffer, pData + 0x0010, 0x20);
 		songinfodata.title=THIS_->titlebuffer;
-		SONGINFO_SetTitle(songinfodata.title);
-
+		SONGINFO_SetTitle(pNezPlay->song, songinfodata.title);
+ 
 		XMEMSET(THIS_->artistbuffer, 0, 0x21);
 		XMEMCPY(THIS_->artistbuffer, pData + 0x0030, 0x20);
 		songinfodata.artist=THIS_->artistbuffer;
-		SONGINFO_SetArtist(songinfodata.artist);
+		SONGINFO_SetArtist(pNezPlay->song, songinfodata.artist);
 
 		XMEMSET(THIS_->copyrightbuffer, 0, 0x21);
 		XMEMCPY(THIS_->copyrightbuffer, pData + 0x0050, 0x20);
 		songinfodata.copyright=THIS_->copyrightbuffer;
-		SONGINFO_SetCopyright(songinfodata.copyright);
-/*
+		SONGINFO_SetCopyright(pNezPlay->song, songinfodata.copyright);
 		sprintf(songinfodata.detail,
 "Type              : GBS\r\n\
 Song Max          : %d\r\n\
@@ -1019,7 +1018,7 @@ Use INT           : %d"
 			,THIS_->maxsong,THIS_->startsong,THIS_->loadaddr,THIS_->initaddr
 			,THIS_->vsyncaddr,THIS_->stackaddr,THIS_->timerflag>>2,THIS_->firstTMA
 			,THIS_->firstTMC,THIS_->isCGB,THIS_->useINT);
-*/		
+		
 		uSize -= 0x70;
 		pData += 0x70;
 		size = uSize + THIS_->loadaddr;
@@ -1028,15 +1027,15 @@ Use INT           : %d"
 		THIS_->bankromnum = (Uint8)(size >> 14);
 		
 	}
-	SONGINFO_SetChannel(2);
-	SONGINFO_SetExtendDevice(0);
-	SONGINFO_SetInitAddress(THIS_->initaddr);
+	SONGINFO_SetChannel(pNezPlay->song, 2);
+	SONGINFO_SetExtendDevice(pNezPlay->song, 0);
+	SONGINFO_SetInitAddress(pNezPlay->song, THIS_->initaddr);
 	//---+
 	if (THIS_->useINT == 1)
-	SONGINFO_SetPlayAddress(THIS_->playaddr);
+	SONGINFO_SetPlayAddress(pNezPlay->song, THIS_->playaddr);
 	else
 	//---+
-	SONGINFO_SetPlayAddress((THIS_->timerflag & 1) ? THIS_->vsyncaddr : THIS_->timeraddr);
+	SONGINFO_SetPlayAddress(pNezPlay->song, (THIS_->timerflag & 1) ? THIS_->vsyncaddr : THIS_->timeraddr);
 	THIS_->bankrom = (Uint8 *)XMALLOC(THIS_->bankromnum << 14);
 	if (!THIS_->bankrom) return NESERR_SHORTOFMEMORY;
 	XMEMSET(THIS_->bankrom, 0, THIS_->bankromnum << 14);
@@ -1068,21 +1067,20 @@ Use INT           : %d"
 
 
 
-static GBRDMG *gbrdmg = 0;
-static Int32 __fastcall ExecuteDMGCPU(void)
+static Int32 __fastcall ExecuteDMGCPU(void *pNezPlay)
 {
-	return gbrdmg ? execute(gbrdmg) : 0;
+	return ((NEZ_PLAY*)pNezPlay)->gbrdmg ? execute((GBRDMG*)((NEZ_PLAY*)pNezPlay)->gbrdmg) : 0;
 }
 
-static void __fastcall DMGSoundRenderStereo(Int32 *d)
+static void __fastcall DMGSoundRenderStereo(void *pNezPlay, Int32 *d)
 {
-	synth(gbrdmg, d);
+	synth((GBRDMG*)((NEZ_PLAY*)pNezPlay)->gbrdmg, d);
 }
 
-static Int32 __fastcall DMGSoundRenderMono(void)
+static Int32 __fastcall DMGSoundRenderMono(void *pNezPlay)
 {
 	Int32 d[2] = { 0,0 } ;
-	synth(gbrdmg, d);
+	synth((GBRDMG*)((NEZ_PLAY*)pNezPlay)->gbrdmg, d);
 #if (((-1) >> 1) == -1)
 	return (d[0] + d[1]) >> 1;
 #else
@@ -1090,68 +1088,66 @@ static Int32 __fastcall DMGSoundRenderMono(void)
 #endif
 }
 
-static NES_AUDIO_HANDLER gbrdmg_audio_handler[] = {
+const static NES_AUDIO_HANDLER gbrdmg_audio_handler[] = {
 	{ 0, ExecuteDMGCPU, 0, },
 	{ 3, DMGSoundRenderMono, DMGSoundRenderStereo },
 	{ 0, 0, 0, },
 };
 
-static void __fastcall GBRDMGVolume(Uint32 v)
+static void __fastcall GBRDMGVolume(void *pNezPlay, Uint32 v)
 {
-	if (gbrdmg)
+	if (((NEZ_PLAY*)pNezPlay)->gbrdmg)
 	{
-		volume(gbrdmg, v);
+		volume((GBRDMG*)((NEZ_PLAY*)pNezPlay)->gbrdmg, v);
 	}
 }
 
-static NES_VOLUME_HANDLER gbrdmg_volume_handler[] = {
+const static NES_VOLUME_HANDLER gbrdmg_volume_handler[] = {
 	{ GBRDMGVolume, }, 
 	{ 0, }, 
 };
 
-static void __fastcall GBRDMGCPUReset(void)
+static void __fastcall GBRDMGCPUReset(void *pNezPlay)
 {
-	if (gbrdmg) reset(gbrdmg);
+	if (((NEZ_PLAY*)pNezPlay)->gbrdmg) reset((NEZ_PLAY*)pNezPlay);
 }
 
-static NES_RESET_HANDLER gbrdmg_reset_handler[] = {
+const static NES_RESET_HANDLER gbrdmg_reset_handler[] = {
 	{ NES_RESET_SYS_LAST, GBRDMGCPUReset, },
 	{ 0,                  0, },
 };
 
-static void __fastcall GBRDMGCPUTerminate(void)
+static void __fastcall GBRDMGCPUTerminate(void *pNezPlay)
 {
-	if (gbrdmg)
+	if (((NEZ_PLAY*)pNezPlay)->gbrdmg)
 	{
-		terminate(gbrdmg);
-		gbrdmg = 0;
+		terminate((GBRDMG*)((NEZ_PLAY*)pNezPlay)->gbrdmg);
+		((NEZ_PLAY*)pNezPlay)->gbrdmg = 0;
 	}
 }
 
-static NES_TERMINATE_HANDLER gbrdmg_terminate_handler[] = {
+const static NES_TERMINATE_HANDLER gbrdmg_terminate_handler[] = {
 	{ GBRDMGCPUTerminate, },
 	{ 0, },
 };
 
-Uint32 GBRLoad(Uint8 *pData, Uint32 uSize)
+Uint32 GBRLoad(NEZ_PLAY *pNezPlay, Uint8 *pData, Uint32 uSize)
 {
 	Uint32 ret;
 	GBRDMG *THIS_;
 
-//	if (gbrdmg) *((char *)(0)) = 0;	/* ASSERT */
-
-	THIS_ = XMALLOC(sizeof(GBRDMG));
+	THIS_ = (GBRDMG *)XMALLOC(sizeof(GBRDMG));
 	if (!THIS_) return NESERR_SHORTOFMEMORY;
-	ret = load(THIS_, pData, uSize);
+	ret = load(pNezPlay, THIS_, pData, uSize);
 	if (ret)
 	{
 		terminate(THIS_);
 		return ret;
 	}
-	gbrdmg = THIS_;
-	NESAudioHandlerInstall(gbrdmg_audio_handler);
-	NESVolumeHandlerInstall(gbrdmg_volume_handler);
-	NESResetHandlerInstall(gbrdmg_reset_handler);
-	NESTerminateHandlerInstall(gbrdmg_terminate_handler);
+	pNezPlay->gbrdmg = THIS_;
+	NESAudioHandlerInstall(pNezPlay, gbrdmg_audio_handler);
+	NESVolumeHandlerInstall(pNezPlay, gbrdmg_volume_handler);
+	NESResetHandlerInstall(pNezPlay->nrh, gbrdmg_reset_handler);
+	NESTerminateHandlerInstall(&pNezPlay->nth, gbrdmg_terminate_handler);
 	return ret;
 }

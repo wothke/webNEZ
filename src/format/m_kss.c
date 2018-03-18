@@ -98,9 +98,6 @@ struct  KSSSEQ_TAG {
 	Uint8 usertone[2][16 * 19];
 };
 
-KSSSEQ *kssseq= 0;
-
-
 Int32 MSXPSGType = 1;
 Int32 MSXPSGVolume = 64;
 
@@ -115,17 +112,6 @@ static Uint32 GetDwordLE(Uint8 *p)
 }
 
 #define GetDwordLEM(p) (Uint32)((((Uint8 *)p)[0] | (((Uint8 *)p)[1] << 8) | (((Uint8 *)p)[2] << 16) | (((Uint8 *)p)[3] << 24)))
-
-/*
-void OPLLSetTone(Uint8 *p, Uint32 type)
-{
-	if ((GetDwordLE(p) & 0xf0ffffff) == GetDwordLEM("ILL0"))
-		XMEMCPY(usertone[type], p, 16 * 19);
-	else
-		XMEMCPY(usertone[type], p, 8 * 15);
-	usertone_enable[type] = 1;
-}
-*/
 
 static Int32 execute(KSSSEQ *THIS_)
 {
@@ -144,7 +130,7 @@ static Int32 execute(KSSSEQ *THIS_)
 	return 0;
 }
 
-static void synth(KSSSEQ *THIS_, Int32 *d)
+__inline static void synth(KSSSEQ *THIS_, Int32 *d)
 {
 	switch (THIS_->synthmode)
 	{
@@ -157,7 +143,7 @@ static void synth(KSSSEQ *THIS_, Int32 *d)
 		case SYNTHMODE_MSX:
 			{
 				Int32 b[2];
-				b[0] = 0;
+				b[0] = b[1] = 0;
 				THIS_->sndp[SND_PSG]->synth(THIS_->sndp[SND_PSG]->ctx, b);
 				b[0] = b[0] * MSXPSGVolume / 64;
 				d[0] += b[0];
@@ -183,7 +169,7 @@ static void synth(KSSSEQ *THIS_, Int32 *d)
 	}
 }
 
-static void volume(KSSSEQ *THIS_, Uint32 v)
+__inline static void volume(KSSSEQ *THIS_, Uint32 v)
 {
 	v += 256;
 	switch (THIS_->synthmode)
@@ -357,7 +343,7 @@ Uint32 memview_memread_kss(Uint32 a){
 //ここまでメモリービュアー設定
 
 //ここからダンプ設定
-//static NEZ_PLAY *pNezPlayDump;
+static NEZ_PLAY *pNezPlayDump;
 Uint32 (*dump_MEM_MSX)(Uint32 a,unsigned char* mem);
 static Uint32 dump_MEM_MSX_bf(Uint32 menu,unsigned char* mem){
 	int i;
@@ -487,15 +473,13 @@ static Uint32 dump_DEV_ADPCM_bf(Uint32 menu,unsigned char* mem){
 }
 //----------
 
-
-
-static void reset()
+static void reset(NEZ_PLAY *pNezPlay)
 {
-	KSSSEQ *THIS_ = kssseq;
+	KSSSEQ *THIS_ = pNezPlay->kssseq;
 	Uint32 i, freq, song;
 
-	freq = NESAudioFrequencyGet();
-	song = SONGINFO_GetSongNo() - 1;
+	freq = NESAudioFrequencyGet(pNezPlay);
+	song = SONGINFO_GetSongNo(pNezPlay->song) - 1;
 	if (song >= THIS_->maxsong) song = THIS_->startsong - 1;
 
 	/* sound reset */
@@ -630,7 +614,7 @@ struct {
 	char detail[1024];
 }songinfodata;
 
-static Uint32 load(KSSSEQ *THIS_, Uint8 *pData, Uint32 uSize)
+static Uint32 load(NEZ_PLAY *pNezPlay, KSSSEQ *THIS_, Uint8 *pData, Uint32 uSize)
 {
 	Uint32 i, headersize;
 	XMEMSET(THIS_, 0, sizeof(KSSSEQ));
@@ -676,12 +660,12 @@ static Uint32 load(KSSSEQ *THIS_, Uint8 *pData, Uint32 uSize)
 	THIS_->bankofs = pData[0x0C];
 	THIS_->banknum = pData[0x0D];
 	THIS_->extdevice = pData[0x0F];
-	SONGINFO_SetStartSongNo(THIS_->startsong);
-	SONGINFO_SetMaxSongNo(THIS_->maxsong);
-	SONGINFO_SetInitAddress(THIS_->initaddr);
-	SONGINFO_SetPlayAddress(THIS_->playaddr);
-	SONGINFO_SetExtendDevice(THIS_->extdevice << 8);
-/*
+	SONGINFO_SetStartSongNo(pNezPlay->song, THIS_->startsong);
+	SONGINFO_SetMaxSongNo(pNezPlay->song, THIS_->maxsong);
+	SONGINFO_SetInitAddress(pNezPlay->song, THIS_->initaddr);
+	SONGINFO_SetPlayAddress(pNezPlay->song, THIS_->playaddr);
+	SONGINFO_SetExtendDevice(pNezPlay->song, THIS_->extdevice << 8);
+
 	sprintf(songinfodata.detail,
 "Type         : KS%c%c\r\n\
 Load Address : %04XH\r\n\
@@ -697,7 +681,6 @@ Extra Device : %s%s%s%s%s"
 		,pData[0x0F]&0x08 ? (pData[0x0F]&0x02 ? "RAM " : "MSX-AUDIO ") : ""
 		,pData[0x0F] ? "" : "None"
 	);
-*/
 	if (THIS_->banknum & 0x80)
 	{
 		THIS_->banknum &= 0x7f;
@@ -758,7 +741,7 @@ Extra Device : %s%s%s%s%s"
 		if (THIS_->extdevice & EXTDEVICE_GGSTEREO)
 		{
 			THIS_->sndp[SND_SNG] = SNGSoundAlloc(SNG_TYPE_GAMEGEAR);
-			SONGINFO_SetChannel(2);
+			SONGINFO_SetChannel(pNezPlay->song, 2);
 			//ここからダンプ設定
 			dump_DEV_SN76489 = dump_DEV_SN76489_bf2;
 			//ここまでダンプ設定
@@ -766,7 +749,7 @@ Extra Device : %s%s%s%s%s"
 		else
 		{
 			THIS_->sndp[SND_SNG] = SNGSoundAlloc(SNG_TYPE_SEGAMKIII);
-			SONGINFO_SetChannel(1);
+			SONGINFO_SetChannel(pNezPlay->song, 1);
 			//ここからダンプ設定
 			dump_DEV_SN76489 = dump_DEV_SN76489_bf;
 			//ここまでダンプ設定
@@ -796,19 +779,19 @@ Extra Device : %s%s%s%s%s"
 		{
 			if (THIS_->extdevice & EXTDEVICE_MSXAUDIO)
 			{
-				SONGINFO_SetChannel(2);
+				SONGINFO_SetChannel(pNezPlay->song, 2);
 				THIS_->synthmode = SYNTHMODE_MSXSTEREO;
 			}
 			else
 			{
-				SONGINFO_SetChannel( 1);
+				SONGINFO_SetChannel(pNezPlay->song, 1);
 				THIS_->synthmode = SYNTHMODE_MSX;
 				THIS_->majutushimode = 1;
 			}
 		}
 		else
 		{
-			SONGINFO_SetChannel( 1);
+			SONGINFO_SetChannel(pNezPlay->song, 1);
 			THIS_->synthmode = SYNTHMODE_MSX;
 		}
 		if(MSXPSGType){
@@ -857,21 +840,21 @@ Extra Device : %s%s%s%s%s"
 	return NESERR_NOERROR;
 }
 
-static Int32 __fastcall KSSSEQExecuteZ80CPU()
+static Int32 __fastcall KSSSEQExecuteZ80CPU(void *pNezPlay)
 {
-	execute(kssseq);
+	execute(((NEZ_PLAY*)pNezPlay)->kssseq);
 	return 0;
 }
 
-static void __fastcall KSSSEQSoundRenderStereo(Int32 *d)
+static void __fastcall KSSSEQSoundRenderStereo(void *pNezPlay, Int32 *d)
 {
-	if (kssseq) synth( kssseq, d);
+	synth(((NEZ_PLAY*)pNezPlay)->kssseq, d);
 }
 
-static Int32 __fastcall KSSSEQSoundRenderMono()
+static Int32 __fastcall KSSSEQSoundRenderMono(void *pNezPlay)
 {
 	Int32 d[2] = { 0, 0 };
-	synth(kssseq, d);
+	synth(((NEZ_PLAY*)pNezPlay)->kssseq, d);
 #if (((-1) >> 1) == -1)
 	return (d[0] + d[1]) >> 1;
 #else
@@ -885,11 +868,11 @@ const static NES_AUDIO_HANDLER kssseq_audio_handler[] = {
 	{ 0, 0, 0, },
 };
 
-static void __fastcall KSSSEQVolume(Uint32 v)
+static void __fastcall KSSSEQVolume(void *pNezPlay, Uint32 v)
 {
-	if (kssseq)
+	if (((NEZ_PLAY*)pNezPlay)->kssseq)
 	{
-		volume(kssseq, v);
+		volume(((NEZ_PLAY*)pNezPlay)->kssseq, v);
 	}
 }
 
@@ -898,9 +881,9 @@ const static NES_VOLUME_HANDLER kssseq_volume_handler[] = {
 	{ 0, }, 
 };
 
-static void __fastcall KSSSEQReset()
+static void __fastcall KSSSEQReset(void *pNezPlay)
 {
-	if (kssseq) reset();
+	if (((NEZ_PLAY*)pNezPlay)->kssseq) reset((NEZ_PLAY*)pNezPlay);
 }
 
 const static NES_RESET_HANDLER kssseq_reset_handler[] = {
@@ -908,12 +891,12 @@ const static NES_RESET_HANDLER kssseq_reset_handler[] = {
 	{ 0,                  0, },
 };
 
-static void __fastcall KSSSEQTerminate()
+static void __fastcall KSSSEQTerminate(void *pNezPlay)
 {
-	if (kssseq)
+	if (((NEZ_PLAY*)pNezPlay)->kssseq)
 	{
-		terminate(kssseq);
-		kssseq = 0;
+		terminate(((NEZ_PLAY*)pNezPlay)->kssseq);
+		((NEZ_PLAY*)pNezPlay)->kssseq = 0;
 	}
 }
 
@@ -922,23 +905,23 @@ const static NES_TERMINATE_HANDLER kssseq_terminate_handler[] = {
 	{ 0, },
 };
 
-Uint32 KSSLoad(Uint8 *pData, Uint32 uSize)
+Uint32 KSSLoad(NEZ_PLAY *pNezPlay, Uint8 *pData, Uint32 uSize)
 {
 	Uint32 ret;
 	KSSSEQ *THIS_;
 
 	THIS_ = XMALLOC(sizeof(KSSSEQ));
 	if (!THIS_) return NESERR_SHORTOFMEMORY;
-	ret = load(THIS_, pData, uSize);
+	ret = load(pNezPlay, THIS_, pData, uSize);
 	if (ret)
 	{
 		terminate(THIS_);
 		return ret;
 	}
-	kssseq = THIS_;
-	NESAudioHandlerInstall(kssseq_audio_handler);
-	NESVolumeHandlerInstall(kssseq_volume_handler);
-	NESResetHandlerInstall(kssseq_reset_handler);
-	NESTerminateHandlerInstall(kssseq_terminate_handler);
+	pNezPlay->kssseq = THIS_;
+	NESAudioHandlerInstall(pNezPlay, kssseq_audio_handler);
+	NESVolumeHandlerInstall(pNezPlay, kssseq_volume_handler);
+	NESResetHandlerInstall(pNezPlay->nrh, kssseq_reset_handler);
+	NESTerminateHandlerInstall(&pNezPlay->nth, kssseq_terminate_handler);
 	return ret;
 }

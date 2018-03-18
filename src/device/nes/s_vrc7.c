@@ -14,11 +14,10 @@
 
 
 typedef struct {
+	Uint8 usertone_enable[1];
+	Uint8 usertone[1][16 * 19];
 	KMIF_SOUND_DEVICE *kmif;
 } OPLLSOUND_INTF;
-static Uint8 usertone_enable[1] = { 0 };
-static Uint8 usertone[1][16 * 19];
-static OPLLSOUND_INTF sndp;
 
 static Uint32 GetDwordLE(Uint8 *p)
 {
@@ -26,45 +25,49 @@ static Uint32 GetDwordLE(Uint8 *p)
 }
 #define GetDwordLEM(p) (Uint32)((((Uint8 *)p)[0] | (((Uint8 *)p)[1] << 8) | (((Uint8 *)p)[2] << 16) | (((Uint8 *)p)[3] << 24)))
 
-void OPLLSetTone(Uint8 *p, Uint32 type)
+void OPLLSetTone(NEZ_PLAY *pNezPlay, Uint8 *p, Uint32 type)
 {
+	OPLLSOUND_INTF *sndp = ((NSFNSF*)(pNezPlay)->nsf)->sndp;
 	if ((GetDwordLE(p) & 0xf0ffffff) == GetDwordLEM("ILL0"))
-		XMEMCPY(usertone[type], p, 16 * 19);
+		XMEMCPY(sndp->usertone[type], p, 16 * 19);
 	else
-		XMEMCPY(usertone[type], p, 8 * 15);
-	usertone_enable[type] = 1;
+		XMEMCPY(sndp->usertone[type], p, 8 * 15);
+	sndp->usertone_enable[type] = 1;
 }
-void VRC7SetTone(Uint8 *p, Uint type)
+
+void VRC7SetTone(NEZ_PLAY *pNezPlay, Uint8 *p, Uint type)
 {
-	extern void OPLLSetTone(Uint8 *p, Uint32 type);
+	OPLLSOUND_INTF *sndp = ((NSFNSF*)(pNezPlay)->nsf)->sndp;
 	switch (type)
 	{
 		case 1:
 			if ((GetDwordLE(p) & 0xf0ffffff) == GetDwordLEM("ILL0"))
-				XMEMCPY(usertone[0], p, 16 * 19);
+				XMEMCPY(sndp->usertone[0], p, 16 * 19);
 			else
-				XMEMCPY(usertone[0], p, 8 * 15);
-			usertone_enable[0] = 1;
+				XMEMCPY(sndp->usertone[0], p, 8 * 15);
+			sndp->usertone_enable[0] = 1;
 			break;
 		case 2:
-			OPLLSetTone(p, 0);
+			OPLLSetTone(pNezPlay, p, 0);
 			break;
 		case 3:
-			OPLLSetTone(p, 1);
+			OPLLSetTone(pNezPlay, p, 1);
 			break;
 	}
 }
 
-static Int32 __fastcall OPLLSoundRender(void)
+static Int32 __fastcall OPLLSoundRender(void* pNezPlay)
 {
+	OPLLSOUND_INTF *sndp = ((NSFNSF*)((NEZ_PLAY*)pNezPlay)->nsf)->sndp;
 	Int32 b[2] = {0, 0};
-	sndp.kmif->synth(sndp.kmif->ctx, b);
+	sndp->kmif->synth(sndp->kmif->ctx, b);
 	return b[0]*VRC7_VOL;
 }
 
-static void __fastcall OPLLSoundRender2(Int32 *d)
+static void __fastcall OPLLSoundRender2(void* pNezPlay, Int32 *d)
 {
-	sndp.kmif->synth(sndp.kmif->ctx, d);
+	OPLLSOUND_INTF *sndp = ((NSFNSF*)((NEZ_PLAY*)pNezPlay)->nsf)->sndp;
+	sndp->kmif->synth(sndp->kmif->ctx, d);
 }
 
 
@@ -74,53 +77,62 @@ const static NES_AUDIO_HANDLER s_opll_audio_handler[] = {
 	{ 0, 0, 0, }, 
 };
 
-static void __fastcall OPLLSoundVolume(Uint32 volume)
+static void __fastcall OPLLSoundVolume(void* pNezPlay, Uint32 volume)
 {
-	sndp.kmif->volume(sndp.kmif->ctx, volume);
+	OPLLSOUND_INTF *sndp = ((NSFNSF*)((NEZ_PLAY*)pNezPlay)->nsf)->sndp;
+	sndp->kmif->volume(sndp->kmif->ctx, volume);
 }
 
 const static NES_VOLUME_HANDLER s_opll_volume_handler[] = {
 	{ OPLLSoundVolume, },
 	{ 0, }, 
 };
-static void __fastcall VRC7SoundReset(void)
+
+static void __fastcall VRC7SoundReset(void* pNezPlay)
 {
-	if (usertone_enable[0]) sndp.kmif->setinst(sndp.kmif->ctx, 0, usertone[0], 16 * 19);
-	sndp.kmif->reset(sndp.kmif->ctx, MASTER_CLOCK, NESAudioFrequencyGet());
+	OPLLSOUND_INTF *sndp = ((NSFNSF*)((NEZ_PLAY*)pNezPlay)->nsf)->sndp;
+	if (sndp->usertone_enable[0]) sndp->kmif->setinst(sndp->kmif->ctx, 0, sndp->usertone[0], 16 * 19);
+	sndp->kmif->reset(sndp->kmif->ctx, MASTER_CLOCK, NESAudioFrequencyGet(pNezPlay));
 }
 
-static NES_RESET_HANDLER s_vrc7_reset_handler[] = {
+const static NES_RESET_HANDLER s_vrc7_reset_handler[] = {
 	{ NES_RESET_SYS_NOMAL, VRC7SoundReset, }, 
 	{ 0,                   0, }, 
 };
 
-static void __fastcall OPLLSoundTerm(void)
+static void __fastcall OPLLSoundTerm(void* pNezPlay)
 {
-	if (sndp.kmif)
-	{
-		sndp.kmif->release(sndp.kmif->ctx);
-		sndp.kmif = 0;
+	OPLLSOUND_INTF *sndp = ((NSFNSF*)((NEZ_PLAY*)pNezPlay)->nsf)->sndp;
+	if (sndp) {
+		if (sndp->kmif) {
+			sndp->kmif->release(sndp->kmif->ctx);
+			sndp->kmif = 0;
+		}
+		XFREE(sndp);
 	}
 }
 
-static NES_TERMINATE_HANDLER s_opll_terminate_handler[] = {
+const static NES_TERMINATE_HANDLER s_opll_terminate_handler[] = {
 	{ OPLLSoundTerm, }, 
 	{ 0, }, 
 };
 
-static void __fastcall OPLLSoundWriteAddr(Uint32 address, Uint32 value)
+static void __fastcall OPLLSoundWriteAddr(void *pNezPlay, Uint32 address, Uint32 value)
 {
-	sndp.kmif->write(sndp.kmif->ctx, 0, value);
+	OPLLSOUND_INTF *sndp = ((NSFNSF*)((NEZ_PLAY*)pNezPlay)->nsf)->sndp;
+	sndp->kmif->write(sndp->kmif->ctx, 0, value);
 }
 
-static void __fastcall OPLLSoundWriteData(Uint32 address, Uint32 value)
+static void __fastcall OPLLSoundWriteData(void *pNezPlay, Uint32 address, Uint32 value)
 {
-	sndp.kmif->write(sndp.kmif->ctx, 1, value);
+	OPLLSOUND_INTF *sndp = ((NSFNSF*)((NEZ_PLAY*)pNezPlay)->nsf)->sndp;
+	sndp->kmif->write(sndp->kmif->ctx, 1, value);
 }
 
-static Uint32 __fastcall MSXAUDIOSoundRead(Uint32 address)
+static Uint32 __fastcall MSXAUDIOSoundRead(void *pNezPlay, Uint32 address)
 {
-	return sndp.kmif->read(sndp.kmif->ctx, address);
+	OPLLSOUND_INTF *sndp = ((NSFNSF*)((NEZ_PLAY*)pNezPlay)->nsf)->sndp;
+	return sndp->kmif->read(sndp->kmif->ctx, address);
 }
 
 
@@ -132,20 +144,25 @@ static NES_WRITE_HANDLER s_vrc7_write_handler[] =
 };
 
 
-void VRC7SoundInstall(void)
+void VRC7SoundInstall(NEZ_PLAY *pNezPlay)
 {
-	XMEMSET(&sndp, 0, sizeof(OPLLSOUND_INTF));
-	usertone_enable[0] = 0;
-	LogTableInitialize();
-	sndp.kmif = OPLSoundAlloc(OPL_TYPE_VRC7);
-	if (sndp.kmif)
-	{
-		NESAudioHandlerInstall(s_opll_audio_handler);
-		NESVolumeHandlerInstall(s_opll_volume_handler);
-		NESTerminateHandlerInstall(s_opll_terminate_handler);
+	OPLLSOUND_INTF *sndp;
+	sndp = XMALLOC(sizeof(OPLLSOUND_INTF));
+	if (!sndp) return;
+	XMEMSET(sndp, 0, sizeof(OPLLSOUND_INTF));
+	((NSFNSF*)pNezPlay->nsf)->sndp = sndp;
 
-		NESResetHandlerInstall(s_vrc7_reset_handler);
-		NESWriteHandlerInstall(s_vrc7_write_handler);
+	sndp->usertone_enable[0] = 0;
+	LogTableInitialize();
+	sndp->kmif = OPLSoundAlloc(OPL_TYPE_VRC7);
+	if (sndp->kmif)
+	{
+		NESAudioHandlerInstall(pNezPlay, s_opll_audio_handler);
+		NESVolumeHandlerInstall(pNezPlay, s_opll_volume_handler);
+		NESTerminateHandlerInstall(&pNezPlay->nth, s_opll_terminate_handler);
+
+		NESResetHandlerInstall(pNezPlay->nrh, s_vrc7_reset_handler);
+		NESWriteHandlerInstall(pNezPlay, s_vrc7_write_handler);
 	}
 }
 

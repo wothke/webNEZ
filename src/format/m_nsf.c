@@ -35,104 +35,102 @@ Uint8 titlebuffer[0x21];
 Uint8 artistbuffer[0x21];
 Uint8 copyrightbuffer[0x21];
 
-
-NSFNSF *nsfnsf= 0;
 /* RAM area */
-static Uint32 __fastcall ReadRam(Uint32 A)
+static Uint32 __fastcall ReadRam(void *pNezPlay, Uint32 A)
 {
-	return nsfnsf->ram[A & 0x07FF];
+	return ((NSFNSF*)((NEZ_PLAY*)pNezPlay)->nsf)->ram[A & 0x07FF];
 }
-static void __fastcall WriteRam(Uint32 A, Uint32 V)
+static void __fastcall WriteRam(void *pNezPlay, Uint32 A, Uint32 V)
 {
-	nsfnsf->ram[A & 0x07FF] = (Uint8)V;
+	((NSFNSF*)((NEZ_PLAY*)pNezPlay)->nsf)->ram[A & 0x07FF] = (Uint8)V;
 }
 
 /* SRAM area */
-static Uint32 __fastcall ReadStaticArea(Uint32 A)
+static Uint32 __fastcall ReadStaticArea(void *pNezPlay, Uint32 A)
 {
-	return nsfnsf->static_area[A - 0x6000];
+	return ((NSFNSF*)((NEZ_PLAY*)pNezPlay)->nsf)->static_area[A - 0x6000];
 }
-static void __fastcall WriteStaticArea(Uint32 A, Uint32 V)
+static void __fastcall WriteStaticArea(void *pNezPlay, Uint32 A, Uint32 V)
 {
-	nsfnsf->static_area[A - 0x6000] = (Uint8)V;
+	((NSFNSF*)((NEZ_PLAY*)pNezPlay)->nsf)->static_area[A - 0x6000] = (Uint8)V;
 }
 
 #if !NSF_MAPPER_STATIC
-static Uint32 __fastcall ReadRom8000(Uint32 A)
+static Uint32 __fastcall ReadRom8000(void *pNezPlay, Uint32 A)
 {
-	return nsfnsf->bank[0][A];
+	return ((NSFNSF*)((NEZ_PLAY*)pNezPlay)->nsf)->bank[0][A];
 }
-static Uint32 __fastcall ReadRom9000(Uint32 A)
+static Uint32 __fastcall ReadRom9000(void *pNezPlay, Uint32 A)
 {
-	return nsfnsf->bank[1][A];
+	return ((NSFNSF*)((NEZ_PLAY*)pNezPlay)->nsf)->bank[1][A];
 }
-static Uint32 __fastcall ReadRomA000(Uint32 A)
+static Uint32 __fastcall ReadRomA000(void *pNezPlay, Uint32 A)
 {
-	return nsfnsf->bank[2][A];
+	return ((NSFNSF*)((NEZ_PLAY*)pNezPlay)->nsf)->bank[2][A];
 }
-static Uint32 __fastcall ReadRomB000(Uint32 A)
+static Uint32 __fastcall ReadRomB000(void *pNezPlay, Uint32 A)
 {
-	return nsfnsf->bank[3][A];
+	return ((NSFNSF*)((NEZ_PLAY*)pNezPlay)->nsf)->bank[3][A];
 }
-static Uint32 __fastcall ReadRomC000(Uint32 A)
+static Uint32 __fastcall ReadRomC000(void *pNezPlay, Uint32 A)
 {
-	return nsfnsf->bank[4][A];
+	return ((NSFNSF*)((NEZ_PLAY*)pNezPlay)->nsf)->bank[4][A];
 }
-static Uint32 __fastcall ReadRomD000(Uint32 A)
+static Uint32 __fastcall ReadRomD000(void *pNezPlay, Uint32 A)
 {
-	return nsfnsf->bank[5][A];
+	return ((NSFNSF*)((NEZ_PLAY*)pNezPlay)->nsf)->bank[5][A];
 }
-static Uint32 __fastcall ReadRomE000(Uint32 A)
+static Uint32 __fastcall ReadRomE000(void *pNezPlay, Uint32 A)
 {
-	return nsfnsf->bank[6][A];
+	return ((NSFNSF*)((NEZ_PLAY*)pNezPlay)->nsf)->bank[6][A];
 }
-static Uint32 __fastcall ReadRomF000(Uint32 A)
+static Uint32 __fastcall ReadRomF000(void *pNezPlay, Uint32 A)
 {
-	return nsfnsf->bank[7][A];
+	return ((NSFNSF*)((NEZ_PLAY*)pNezPlay)->nsf)->bank[7][A];
 }
 
 // ROMに値を書き込むのはできないはずで不正なのだが、
 // これをしないとFDS環境のNSFが動作しないのでしょうがない…
 
-static void __fastcall WriteRom8000(Uint32 A, Uint32 V)
+static void __fastcall WriteRom8000(void *pNezPlay, Uint32 A, Uint32 V)
 {
-	nsfnsf->bank[0][A] = (Uint8)V;
+	((NSFNSF*)((NEZ_PLAY*)pNezPlay)->nsf)->bank[0][A] = (Uint8)V;
 }
-static void __fastcall WriteRom9000(Uint32 A, Uint32 V)
+static void __fastcall WriteRom9000(void *pNezPlay, Uint32 A, Uint32 V)
 {
-	nsfnsf->bank[1][A] = (Uint8)V;
+	((NSFNSF*)((NEZ_PLAY*)pNezPlay)->nsf)->bank[1][A] = (Uint8)V;
 }
-static void __fastcall WriteRomA000(Uint32 A, Uint32 V)
+static void __fastcall WriteRomA000(void *pNezPlay, Uint32 A, Uint32 V)
 {
-	nsfnsf->bank[2][A] = (Uint8)V;
+	((NSFNSF*)((NEZ_PLAY*)pNezPlay)->nsf)->bank[2][A] = (Uint8)V;
 }
-static void __fastcall WriteRomB000(Uint32 A, Uint32 V)
+static void __fastcall WriteRomB000(void *pNezPlay, Uint32 A, Uint32 V)
 {
-	nsfnsf->bank[3][A] = (Uint8)V;
+	((NSFNSF*)((NEZ_PLAY*)pNezPlay)->nsf)->bank[3][A] = (Uint8)V;
 }
-static void __fastcall WriteRomC000(Uint32 A, Uint32 V)
+static void __fastcall WriteRomC000(void *pNezPlay, Uint32 A, Uint32 V)
 {
-	nsfnsf->bank[4][A] = (Uint8)V;
+	((NSFNSF*)((NEZ_PLAY*)pNezPlay)->nsf)->bank[4][A] = (Uint8)V;
 }
-static void __fastcall WriteRomD000(Uint32 A, Uint32 V)
+static void __fastcall WriteRomD000(void *pNezPlay, Uint32 A, Uint32 V)
 {
-	nsfnsf->bank[5][A] = (Uint8)V;
+	((NSFNSF*)((NEZ_PLAY*)pNezPlay)->nsf)->bank[5][A] = (Uint8)V;
 }
-static void __fastcall WriteRomE000(Uint32 A, Uint32 V)
+static void __fastcall WriteRomE000(void *pNezPlay, Uint32 A, Uint32 V)
 {
-	nsfnsf->bank[6][A] = (Uint8)V;
+	((NSFNSF*)((NEZ_PLAY*)pNezPlay)->nsf)->bank[6][A] = (Uint8)V;
 }
-static void __fastcall WriteRomF000(Uint32 A, Uint32 V)
+static void __fastcall WriteRomF000(void *pNezPlay, Uint32 A, Uint32 V)
 {
-	nsfnsf->bank[7][A] = (Uint8)V;
+	((NSFNSF*)((NEZ_PLAY*)pNezPlay)->nsf)->bank[7][A] = (Uint8)V;
 }
 #endif
 
 /* Mapper I/O */
-static void __fastcall WriteMapper(Uint32 A, Uint32 V)
+static void __fastcall WriteMapper(void *pNezPlay, Uint32 A, Uint32 V)
 {
 	Uint32 bank;
-	NSFNSF *nsf = nsfnsf;
+	NSFNSF *nsf = ((NSFNSF*)((NEZ_PLAY*)pNezPlay)->nsf);
 	bank = A - 0x5FF0;
 	if (bank < 6 || bank > 15) return;
 #if !NSF_MAPPER_STATIC
@@ -155,9 +153,9 @@ static void __fastcall WriteMapper(Uint32 A, Uint32 V)
 		XMEMSET(&nsf->static_area[(bank - 6) << 12], 0x00, 0x1000);
 }
 
-static Uint32 __fastcall Read2000(Uint32 A)
+static Uint32 __fastcall Read2000(void *pNezPlay, Uint32 A)
 {
-	NSFNSF *nsf = nsfnsf;
+	NSFNSF *nsf = ((NSFNSF*)((NEZ_PLAY*)pNezPlay)->nsf);
 	switch(A & 0x7){
 	case 0:
 		return 0xff;
@@ -234,9 +232,9 @@ static NES_WRITE_HANDLER nsf_mapper_write_handler2[] = {
 	{ 0     ,0     ,0, },
 };
 
-Uint8 *NSFGetHeader()
+Uint8 *NSFGetHeader(NEZ_PLAY *pNezPlay)
 {
-	return nsfnsf->head;
+	return ((NSFNSF*)((NEZ_PLAY*)pNezPlay)->nsf)->head;
 }
 
 static Uint GetWordLE(Uint8 *p)
@@ -244,30 +242,30 @@ static Uint GetWordLE(Uint8 *p)
 	return p[0] | (p[1] << 8);
 }
 
-static void __fastcall ResetBank()
+static void __fastcall ResetBank(void *pNezPlay)
 {
 	Uint i, startbank;
-	NSFNSF *nsf = nsfnsf;
+	NSFNSF *nsf = (NSFNSF*)((NEZ_PLAY*)pNezPlay)->nsf;
 	XMEMSET(nsf->ram, 0, 0x0800);
 	startbank = GetWordLE(nsf->head + 8) >> 12;
 	for (i = 0; i < 16; i++)
-		WriteMapper(0x5FF0 + i, 0x10000/* off */);
+		WriteMapper(pNezPlay, 0x5FF0 + i, 0x10000/* off */);
 	if (nsf->banksw)
 	{
 		for (i = 0; (startbank + i) < 8; i++)
-			WriteMapper(0x5FF0 + (startbank + i) , i);
+			WriteMapper(pNezPlay, 0x5FF0 + (startbank + i) , i);
 		if (nsf->banksw & 2)
 		{
-			WriteMapper(0x5FF6, nsf->head[0x70 + 6]);
-			WriteMapper(0x5FF7, nsf->head[0x70 + 7]);
+			WriteMapper(pNezPlay, 0x5FF6, nsf->head[0x70 + 6]);
+			WriteMapper(pNezPlay, 0x5FF7, nsf->head[0x70 + 7]);
 		}
 		for (i = 8; i < 16; i++)
-			WriteMapper(0x5FF0 + i, nsf->head[0x70 + i - 8]);
+			WriteMapper(pNezPlay, 0x5FF0 + i, nsf->head[0x70 + i - 8]);
 	}
 	else
 	{
 		for (i = startbank; i < 16; i++)
-			WriteMapper(0x5FF0 + i , i - startbank);
+			WriteMapper(pNezPlay, 0x5FF0 + i , i - startbank);
 	}
 }
 
@@ -277,19 +275,18 @@ const static NES_RESET_HANDLER nsf_mapper_reset_handler[] = {
 };
 
 //ここからダンプ設定
-//static NEZ_PLAY *pNezPlayDump;
+static NEZ_PLAY *pNezPlayDump;
 Uint32 (*dump_MEM_FC)(Uint32 a,unsigned char* mem);
 static Uint32 dump_MEM_FC_bf(Uint32 menu,unsigned char* mem){
 	int i;
 	switch(menu){
 	case 1://Memory
 		for(i=0;i<0x10000;i++)
-			mem[i] = i<0x2000||i>0x2fff ? NES6502Read(i):0;
+			mem[i] = i<0x2000||i>0x2fff ? NES6502Read(pNezPlayDump, i):0;
 		return i;
 	}
 	return -2;
 }
-
 //----------
 extern Uint8 *regdata_2a03;
 Uint32 (*dump_DEV_2A03)(Uint32 a,unsigned char* mem);
@@ -304,13 +301,13 @@ static Uint32 dump_DEV_2A03_bf(Uint32 menu,unsigned char* mem){
 		return i;
 	case 2://DPCM Data
 		for(i=0,adr=regdata_2a03[0x12]*0x40L+0xc000;i<regdata_2a03[0x13]*0x10L+1;i++){
-			mem[i] = NES6502Read(adr);
+			mem[i] = NES6502Read(pNezPlayDump, adr);
 			adr++;if(adr>0xffff)adr=0x8000;
 		}
 		return i;
 	case 10://*DPCM Data to FlMML
 		for(i=0,adr=regdata_2a03[0x12]*0x40L+0xc000;i<regdata_2a03[0x13]*0x10L+1;i++){
-			membf[i] = NES6502Read(adr);
+			membf[i] = NES6502Read(pNezPlayDump, adr);
 			adr++;if(adr>0xffff)adr=0x8000;
 		}
 		k=sprintf(mem,"#WAV9 [n],%d,%d,",regdata_2a03[0x11]&0x7f,(regdata_2a03[0x10]&0x40)?1:0);
@@ -329,7 +326,6 @@ static Uint32 dump_DEV_2A03_bf(Uint32 menu,unsigned char* mem){
 	}
 	return -2;
 }
-
 //----------
 extern Uint8 *fds_regdata;
 extern Uint8 *fds_regdata2;
@@ -501,9 +497,10 @@ static Uint32 dump_DEV_OPLL_bf(Uint32 menu,unsigned char* mem){
 //----------
 //ここまでダンプ設定
 
-static void __fastcall Terminate()
+static void __fastcall Terminate(void *pNezPlay)
 {
-	if (nsfnsf)
+	NSFNSF *nsf = (NSFNSF*)((NEZ_PLAY*)pNezPlay)->nsf;
+	if (nsf)
 	{
 		//ここからダンプ設定
 		dump_MEM_FC    = NULL;
@@ -515,13 +512,13 @@ static void __fastcall Terminate()
 		dump_DEV_AY8910= NULL;
 		dump_DEV_OPLL  = NULL;
 		//ここまでダンプ設定
-		if (nsfnsf->bankbase)
+		if (nsf->bankbase)
 		{
-			XFREE(nsfnsf->bankbase);
-			nsfnsf->bankbase = 0;
+			XFREE(nsf->bankbase);
+			nsf->bankbase = 0;
 		}
-		XFREE(nsfnsf);
-		nsfnsf = 0;
+		XFREE(nsf);
+		((NEZ_PLAY*)pNezPlay)->nsf = 0;
 	}
 }
 
@@ -530,11 +527,11 @@ const static NES_TERMINATE_HANDLER nsf_mapper_terminate_handler[] = {
 	{ 0, },
 };
 
-static Uint NSFMapperInitialize(Uint8 *pData, Uint uSize)
+static Uint NSFMapperInitialize(NEZ_PLAY *pNezPlay, Uint8 *pData, Uint uSize)
 {
 	Uint32 size = uSize;
 	Uint8 *data = pData;
-	NSFNSF *nsf = nsfnsf;
+	NSFNSF *nsf = (NSFNSF*)pNezPlay->nsf;
 
 	size += GetWordLE(nsf->head + 8) & 0x0FFF;
 	size  = (size + 0x0FFF) & ~0x0FFF;
@@ -547,24 +544,24 @@ static Uint NSFMapperInitialize(Uint8 *pData, Uint uSize)
 	XMEMCPY(nsf->bankbase + (GetWordLE(nsf->head + 8) & 0x0FFF), data, uSize);
 
 	nsf->banksw = nsf->head[0x70] || nsf->head[0x71] || nsf->head[0x72] || nsf->head[0x73] || nsf->head[0x74] || nsf->head[0x75] || nsf->head[0x76] || nsf->head[0x77];
-	if (SONGINFO_GetExtendDevice() & EXTSOUND_FDS) nsf->banksw <<= 1;
+	if (SONGINFO_GetExtendDevice(pNezPlay->song) & EXTSOUND_FDS) nsf->banksw <<= 1;
 	return NESERR_NOERROR;
 }
 
-Uint NSFDeviceInitialize()
+Uint NSFDeviceInitialize(NEZ_PLAY *pNezPlay)
 {
-	NSFNSF *nsf = nsfnsf;
-	NESResetHandlerInstall(nsf_mapper_reset_handler);
-	NESTerminateHandlerInstall(nsf_mapper_terminate_handler);
-	NESReadHandlerInstall(nsf_mapper_read_handler);
+	NSFNSF *nsf = (NSFNSF*)pNezPlay->nsf;
+	NESResetHandlerInstall(pNezPlay->nrh, nsf_mapper_reset_handler);
+	NESTerminateHandlerInstall(&pNezPlay->nth, nsf_mapper_terminate_handler);
+	NESReadHandlerInstall(pNezPlay, nsf_mapper_read_handler);
 	//FDSのみをサポートしている場合のみ8000-DFFFも書き込み可能-
-//	if(pNezPlay->song->extdevice == 4){							// FIXME what is this for?
-//		NESWriteHandlerInstall(nsf_mapper_write_handler_fds);
-//	}else{
-		NESWriteHandlerInstall(nsf_mapper_write_handler);
-//	}
+	if(pNezPlay->song->extdevice == 4){
+		NESWriteHandlerInstall(pNezPlay, nsf_mapper_write_handler_fds);
+	}else{
+		NESWriteHandlerInstall(pNezPlay, nsf_mapper_write_handler);
+	}
 
-	if (nsf->banksw) NESWriteHandlerInstall(nsf_mapper_write_handler2);
+	if (nsf->banksw) NESWriteHandlerInstall(pNezPlay, nsf_mapper_write_handler2);
 
 	XMEMSET(nsf->ram, 0, 0x0800);
 	XMEMSET(nsf->static_area, 0, sizeof(nsf->static_area));
@@ -572,62 +569,60 @@ Uint NSFDeviceInitialize()
 	XMEMSET(nsf->zero_area, 0, sizeof(nsf->zero_area));
 #endif
 
-	APUSoundInstall();
-	if (SONGINFO_GetExtendDevice() & EXTSOUND_VRC6) VRC6SoundInstall();
-	if (SONGINFO_GetExtendDevice() & EXTSOUND_VRC7) VRC7SoundInstall();
-	if (SONGINFO_GetExtendDevice() & EXTSOUND_FDS)  FDSSoundInstall();
-	if (SONGINFO_GetExtendDevice() & EXTSOUND_MMC5)
+	APUSoundInstall(pNezPlay);
+	if (SONGINFO_GetExtendDevice(pNezPlay->song) & EXTSOUND_VRC6) VRC6SoundInstall(pNezPlay);
+	if (SONGINFO_GetExtendDevice(pNezPlay->song) & EXTSOUND_VRC7) VRC7SoundInstall(pNezPlay);
+	if (SONGINFO_GetExtendDevice(pNezPlay->song) & EXTSOUND_FDS)  FDSSoundInstall(pNezPlay);
+	if (SONGINFO_GetExtendDevice(pNezPlay->song) & EXTSOUND_MMC5)
 	{
-		MMC5SoundInstall();
-		MMC5MutiplierInstall();
-		MMC5ExtendRamInstall();
+		MMC5SoundInstall(pNezPlay);
+		MMC5MutiplierInstall(pNezPlay);
+		MMC5ExtendRamInstall(pNezPlay);
 	}
-	if (SONGINFO_GetExtendDevice() & EXTSOUND_N106) N106SoundInstall();
-	if (SONGINFO_GetExtendDevice() & EXTSOUND_FME7) FME7SoundInstall();
+	if (SONGINFO_GetExtendDevice(pNezPlay->song) & EXTSOUND_N106) N106SoundInstall(pNezPlay);
+	if (SONGINFO_GetExtendDevice(pNezPlay->song) & EXTSOUND_FME7) FME7SoundInstall(pNezPlay);
 
 	nsf->counter2002 = 0;	//暫定
 
 	//ここからダンプ設定
-//	pNezPlayDump = pNezPlay;
+	pNezPlayDump = pNezPlay;
 	dump_MEM_FC = dump_MEM_FC_bf;
 	dump_DEV_2A03 = dump_DEV_2A03_bf;
-	if (SONGINFO_GetExtendDevice() & EXTSOUND_FDS)  dump_DEV_FDS   = dump_DEV_FDS_bf;
-	if (SONGINFO_GetExtendDevice() & EXTSOUND_MMC5) dump_DEV_MMC5  = dump_DEV_MMC5_bf;
-	if (SONGINFO_GetExtendDevice() & EXTSOUND_VRC6) dump_DEV_VRC6  = dump_DEV_VRC6_bf;
-	if (SONGINFO_GetExtendDevice() & EXTSOUND_N106) dump_DEV_N106  = dump_DEV_N106_bf;
-	if (SONGINFO_GetExtendDevice() & EXTSOUND_FME7) dump_DEV_AY8910= dump_DEV_AY8910_bf;
-	if (SONGINFO_GetExtendDevice() & EXTSOUND_VRC7) dump_DEV_OPLL  = dump_DEV_OPLL_bf;
+	if (SONGINFO_GetExtendDevice(pNezPlay->song) & EXTSOUND_FDS)  dump_DEV_FDS   = dump_DEV_FDS_bf;
+	if (SONGINFO_GetExtendDevice(pNezPlay->song) & EXTSOUND_MMC5) dump_DEV_MMC5  = dump_DEV_MMC5_bf;
+	if (SONGINFO_GetExtendDevice(pNezPlay->song) & EXTSOUND_VRC6) dump_DEV_VRC6  = dump_DEV_VRC6_bf;
+	if (SONGINFO_GetExtendDevice(pNezPlay->song) & EXTSOUND_N106) dump_DEV_N106  = dump_DEV_N106_bf;
+	if (SONGINFO_GetExtendDevice(pNezPlay->song) & EXTSOUND_FME7) dump_DEV_AY8910= dump_DEV_AY8910_bf;
+	if (SONGINFO_GetExtendDevice(pNezPlay->song) & EXTSOUND_VRC7) dump_DEV_OPLL  = dump_DEV_OPLL_bf;
 	//ここまでダンプ設定
-	
 	return NESERR_NOERROR;
 }
 
 
-static void NSFMapperSetInfo(Uint8 *pData)
+static void NSFMapperSetInfo(NEZ_PLAY *pNezPlay, Uint8 *pData)
 {
-	XMEMCPY(nsfnsf->head, pData, 0x80);
-	SONGINFO_SetStartSongNo(pData[0x07]);
-	SONGINFO_SetMaxSongNo(pData[0x06]);
-	SONGINFO_SetExtendDevice(pData[0x7B]);
-	SONGINFO_SetInitAddress(GetWordLE(pData + 0x0A));
-	SONGINFO_SetPlayAddress(GetWordLE(pData + 0x0C));
-	SONGINFO_SetChannel(1);
+	XMEMCPY(((NSFNSF*)pNezPlay->nsf)->head, pData, 0x80);
+	SONGINFO_SetStartSongNo(pNezPlay->song, pData[0x07]);
+	SONGINFO_SetMaxSongNo(pNezPlay->song, pData[0x06]);
+	SONGINFO_SetExtendDevice(pNezPlay->song, pData[0x7B]);
+	SONGINFO_SetInitAddress(pNezPlay->song, GetWordLE(pData + 0x0A));
+	SONGINFO_SetPlayAddress(pNezPlay->song, GetWordLE(pData + 0x0C));
+	SONGINFO_SetChannel(pNezPlay->song, 1);
 
 	XMEMSET(titlebuffer, 0, 0x21);
 	XMEMCPY(titlebuffer, pData + 0x000e, 0x20);
 	songinfodata.title=titlebuffer;
-	SONGINFO_SetTitle(titlebuffer);
+	SONGINFO_SetTitle(pNezPlay->song, titlebuffer);
 
 	XMEMSET(artistbuffer, 0, 0x21);
 	XMEMCPY(artistbuffer, pData + 0x002e, 0x20);
 	songinfodata.artist=artistbuffer;
-	SONGINFO_SetArtist(artistbuffer);
+	SONGINFO_SetArtist(pNezPlay->song, artistbuffer);
 
 	XMEMSET(copyrightbuffer, 0, 0x21);
 	XMEMCPY(copyrightbuffer, pData + 0x004e, 0x20);
 	songinfodata.copyright=copyrightbuffer;
-	SONGINFO_SetCopyright(copyrightbuffer);
-/*
+	SONGINFO_SetCopyright(pNezPlay->song, copyrightbuffer);
 	sprintf(songinfodata.detail,
 "Type          : NSF\r\n\
 Song Max      : %d\r\n\
@@ -663,26 +658,25 @@ First ROM Bank(F000-FFFF or 7000-7FFF): %02XH"
 		,pData[0x70]|pData[0x71]|pData[0x72]|pData[0x73]|pData[0x74]|pData[0x75]|pData[0x76]|pData[0x77] ? 1 : 0
 		,pData[0x70],pData[0x71],pData[0x72],pData[0x73],pData[0x74],pData[0x75],pData[0x76],pData[0x77]
 	);
-	*/
 }
 
-Uint NSFLoad(Uint8 *pData, Uint uSize)
+Uint NSFLoad(NEZ_PLAY *pNezPlay, Uint8 *pData, Uint uSize)
 {
 	Uint ret;
 	NSFNSF *THIS_ = (NSFNSF *)XMALLOC(sizeof(NSFNSF));
 	if (!THIS_) return NESERR_SHORTOFMEMORY;
 	XMEMSET(THIS_, 0, sizeof(NSFNSF));
 	THIS_->fds_type = 2;
-	nsfnsf = THIS_;
-	NESMemoryHandlerInitialize();
-	NSFMapperSetInfo(pData);
-	ret = NSF6502Install();
+	pNezPlay->nsf = THIS_;
+	NESMemoryHandlerInitialize(pNezPlay);
+	NSFMapperSetInfo(pNezPlay, pData);
+	ret = NSF6502Install(pNezPlay);
 	if (ret) return ret;
-	ret = NSFMapperInitialize(pData + 0x80, uSize - 0x80);
+	ret = NSFMapperInitialize(pNezPlay, pData + 0x80, uSize - 0x80);
 	if (ret) return ret;
-	ret = NSFDeviceInitialize();
+	ret = NSFDeviceInitialize(pNezPlay);
 	if (ret) return ret;
-	SONGINFO_SetSongNo(SONGINFO_GetStartSongNo());
+	SONGINFO_SetSongNo(pNezPlay->song, SONGINFO_GetStartSongNo(pNezPlay->song));
 	return NESERR_NOERROR;
 }
 

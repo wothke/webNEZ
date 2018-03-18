@@ -234,7 +234,7 @@ static Uint8 SweepStep(SWEEP *sw, Uint8 *key)
 //MRN : こんな感じのゾンビらしい
 static void DMGZombieMode(ENVELOPEDECAY *ed, Uint32 *value, Uint8 *key)
 {
-	
+
 //	if(!ed->rate || !(*value & 0x07)){
 		//エンペローブが下向きで、音量が0ならキーオフ
 		if(!(*value & 0xf8)) *key = 0;
@@ -309,13 +309,13 @@ static Int32 DMGSoundSquareRender(DMGSOUND *sndp, DMG_SQUARE *ch)
 		ch->ct++;
 		if(ch->ct >= (1 << SQ_RENDERS)){
 			ch->ct = 0;
-		ch->st++;
+			ch->st++;
 			ch->st &= 0x7;
 
 			ch->output = ch->key ? (!ch->mute ? ch->ed.volume * square_duty_table[ch->duty][ch->st] : 0 ) : (GBAMode ? 0 : 0x8);
 			ch->output = LinToLog(sndp->logtbl, ch->output) + ch->mastervolume;
 			ch->output = LogToLin(sndp->logtbl, ch->output, LOG_LIN_BITS - LIN_BITS - 14);
-	}
+		}
 	}
 
 	//if (ch->mute) return 0;
@@ -337,7 +337,7 @@ static Int32 DMGSoundWaveMemoryRender(DMGSOUND *sndp, DMG_WAVEMEMORY *ch)
 	Int32 outputbuf=0,count=0;
 	Uint32 wl;
 	ch->fc += ch->cps;
-
+	
 	while (ch->fc >= ch->cpf)
 	{
 		ch->fc -= ch->cpf;
@@ -387,18 +387,18 @@ static Int32 DMGSoundWaveMemoryRender(DMGSOUND *sndp, DMG_WAVEMEMORY *ch)
 			outputbuf += ch->output;
 			count++;
 			//---
-		ch->pt -= wl;
+			ch->pt -= wl;
 			ch->ct++;
 /*			if((ch->ct | (0xff-(1<<(WM_RENDERS-KAERUNOISE_BITS))+1))==(0xff-(1<<(WM_RENDERS-KAERUNOISE_BITS))+1)){
 				//カエルクリックノイズ
 				if(sndp->nazo.enable == 8 && !sndp->wavememory.key){
 						sndp->nazo.enable = 1;
 				}
-	}
+			}
 */			if(ch->ct >= (1 << WM_RENDERS)){
 				ch->ct = 0;
 				if(ch->key)ch->st++;
-	ch->st &= 0x1f;
+				ch->st &= 0x1f;
 
 				DMG_WAVE_REN;
 //				ch->output = ch->on ? (ch->key ? (ch->tone[ch->st] >> ch->volume)<<2 : 0) : (sndp->common.regs[0xc]&0xf)<<2;
@@ -411,7 +411,7 @@ static Int32 DMGSoundWaveMemoryRender(DMGSOUND *sndp, DMG_WAVEMEMORY *ch)
 					ch->output -= LogToLin(sndp->logtbl, outputch, LOG_LIN_BITS - LIN_BITS - 14);
 				}
 */			}
-	}
+		}
 		//---
 		outputbuf += ch->output;
 		count++;
@@ -432,6 +432,7 @@ static Int32 DMGSoundNoiseRender(DMGSOUND *sndp, DMG_NOISE *ch)
 		if (!(ch->fp & 3)) EnvelopeDecayStep(&ch->ed);		/* 64Hz */
 		LengthCounterStep(&ch->lc, &ch->mute);				/* 256Hz */
 		ch->fp++;
+
 	}
 
 	ch->pt += ch->cps;
@@ -451,16 +452,16 @@ static Int32 DMGSoundNoiseRender(DMGSOUND *sndp, DMG_NOISE *ch)
 		ch->ct++;
 		if(ch->ct >= 16){ch->ct=0;
 			if(ch->rng == 0)ch->rng = 1;
-		ch->rng += ch->rng + (((ch->rng >> ch->step1) ^ (ch->rng >> ch->step2)) & 1);
+			ch->rng +=  ch->rng + (((ch->rng >> ch->step1) ^ (ch->rng >> ch->step2)) & 1);
 			ch->edge ^=/*|=*/ (ch->rng/* ^ ch->rngold*/) & 1;
-		ch->rngold = ch->rng;
+			ch->rngold = ch->rng;
 
 			ch->output = ch->key ? (!ch->mute ? ch->ed.volume - (ch->edge * ch->ed.volume) : 0 ) : (GBAMode ? (0) : (8));
 			ch->output = LinToLog(sndp->logtbl, ch->output) + ch->mastervolume;
 			ch->output = LogToLin(sndp->logtbl, ch->output, LOG_LIN_BITS - LIN_BITS - 14);
-	}
+		}
 		ch->pt -= (ch->divratio << (CPS_BITS-4));
-}
+	}
 
 	//if (ch->mute) return 0;
 	//---
@@ -607,7 +608,7 @@ static void sndwrite(void *ctx, Uint32 a, Uint32 v)
 		}
 		return;
 	}else{
-	sndp->common.regs[a - 0xff10] = v;
+		sndp->common.regs[a - 0xff10] = v;
 	}
 #else
 	if (0xff30 <= a && a <= 0xff3f)
@@ -645,7 +646,7 @@ static void sndwrite(void *ctx, Uint32 a, Uint32 v)
 //				sndp->square[ch].ed.rate = sndp->square[ch].ed.initial_rate;
 			if(sndp->square[ch].ed.initial_rate){
 				sndp->square[ch].ed.rate = sndp->square[ch].ed.initial_rate;
-			sndp->square[ch].ed.volume = sndp->square[ch].ed.initial_volume;
+				sndp->square[ch].ed.volume = sndp->square[ch].ed.initial_volume;
 			}
 			break;
 		case 0xff13:
@@ -803,7 +804,7 @@ static void sndwrite(void *ctx, Uint32 a, Uint32 v)
 //				sndp->noise.ed.rate = sndp->noise.ed.initial_rate;
 			if(sndp->noise.ed.rate){
 				sndp->noise.ed.rate = sndp->noise.ed.initial_rate;
-			sndp->noise.ed.volume = sndp->noise.ed.initial_volume;
+				sndp->noise.ed.volume = sndp->noise.ed.initial_volume;
 			}
 			break;
 		case 0xff22:
@@ -983,9 +984,9 @@ static void sndrelease(void *ctx)
 {
 	DMGSOUND *sndp = ctx;
 	if (sndp) {
-	if (sndp->logtbl) sndp->logtbl->release(sndp->logtbl->ctx);
-	XFREE(sndp);
-}
+		if (sndp->logtbl) sndp->logtbl->release(sndp->logtbl->ctx);
+		XFREE(sndp);
+	}
 }
 
 static void setinst(void *ctx, Uint32 n, void *p, Uint32 l){}

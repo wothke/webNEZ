@@ -7,40 +7,46 @@
 extern "C" {
 #endif
 
-// NSFflag
-#define SONGINFO_OTHER 0
-#define SONGINFO_NSF 1
-    
+typedef struct SONG_INFO_TAG
+{
+	Uint songno;
+	Uint maxsongno;
+	Uint startsongno;
+	Uint extdevice;
+	Uint initaddress;
+	Uint playaddress;
+	Uint channel;
+	Uint initlimit;
 
-Uint SONGINFO_GetSongNo(void);
-void SONGINFO_SetSongNo(Uint v);
-Uint SONGINFO_GetStartSongNo(void);
-void SONGINFO_SetStartSongNo(Uint v);
-Uint SONGINFO_GetMaxSongNo(void);
-void SONGINFO_SetMaxSongNo(Uint v);
-Uint SONGINFO_GetExtendDevice(void);
-void SONGINFO_SetExtendDevice(Uint v);
-Uint SONGINFO_GetInitAddress(void);
-void SONGINFO_SetInitAddress(Uint v);
-Uint SONGINFO_GetPlayAddress(void);
-void SONGINFO_SetPlayAddress(Uint v);
-Uint SONGINFO_GetChannel(void);
-void SONGINFO_SetChannel(Uint v);
-Uint SONGINFO_GetInitializeLimiter(void);
-void SONGINFO_SetInitializeLimiter(Uint v);
+    char title[128];
+    char artist[128];	
+    char copyright[128];
+} SONG_INFO;
 
-Uint SONGINFO_GetNSFflag(void);
-void SONGINFO_SetNSFflag(Uint v);
+SONG_INFO* SONGINFO_New();
+void SONGINFO_Delete(SONG_INFO *info);
+Uint SONGINFO_GetSongNo(SONG_INFO*);
+void SONGINFO_SetSongNo(SONG_INFO*, Uint v);
+Uint SONGINFO_GetStartSongNo(SONG_INFO*);
+void SONGINFO_SetStartSongNo(SONG_INFO*, Uint v);
+Uint SONGINFO_GetMaxSongNo(SONG_INFO*);
+void SONGINFO_SetMaxSongNo(SONG_INFO*, Uint v);
+Uint SONGINFO_GetExtendDevice(SONG_INFO*);
+void SONGINFO_SetExtendDevice(SONG_INFO*, Uint v);
+Uint SONGINFO_GetInitAddress(SONG_INFO*);
+void SONGINFO_SetInitAddress(SONG_INFO*, Uint v);
+Uint SONGINFO_GetPlayAddress(SONG_INFO*);
+void SONGINFO_SetPlayAddress(SONG_INFO*, Uint v);
+Uint SONGINFO_GetChannel(SONG_INFO*);
+void SONGINFO_SetChannel(SONG_INFO*, Uint v);
 
-void SONGINFO_SetTitle(const char *title);
-char *SONGINFO_GetTitle(void);
-
-// EMSCRIPTEN added these for use in SGC
-void SONGINFO_SetArtist(const char *artist);
-char *SONGINFO_GetArtist(void);
-void SONGINFO_SetCopyright(const char *copyright);
-char *SONGINFO_GetCopyright(void);
-void SONGINFO_Reset(void);
+void SONGINFO_SetTitle(SONG_INFO*,const char *title);
+char *SONGINFO_GetTitle(SONG_INFO*);
+void SONGINFO_SetArtist(SONG_INFO*,const char *artist);
+char *SONGINFO_GetArtist(SONG_INFO*);
+void SONGINFO_SetCopyright(SONG_INFO*, const char *copyright);
+char *SONGINFO_GetCopyright(SONG_INFO*);
+void SONGINFO_Reset(SONG_INFO*);
 
 #ifdef __cplusplus
 }

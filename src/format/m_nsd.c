@@ -4,9 +4,6 @@
 #include "nsf6502.h"
 #include "m_nsf.h"
 #include "m_nsd.h"
-#include "songinfo.h"
-
-extern NSFNSF *nsfnsf;
 
 Uint32 NSDPlayerGetCycles(void)
 {
@@ -33,10 +30,9 @@ typedef struct
 	Uint8 *current;
 } NSDSEQ;
 
-static NSDSEQ *nsdplayer = 0;
-
-static Uint NSDPlayStep()
+static __inline Uint NSDPlayStep(NEZ_PLAY *pNezPlay)
 {
+	NSDSEQ *nsdplayer = pNezPlay->nsdp;
 	while (1)
 	{
 		Uint8 c;
@@ -68,30 +64,30 @@ static Uint NSDPlayStep()
 				break;
 			case 0x1F:
 				/* VRC7 */
-				NES6502Write(0x9010, *nsdplayer->current++);
-				NES6502Write(0x9030, *nsdplayer->current++);
+				NES6502Write(pNezPlay, 0x9010, *nsdplayer->current++);
+				NES6502Write(pNezPlay, 0x9030, *nsdplayer->current++);
 				break;
 			case 0x36:
 				/* N106 */
-				NES6502Write(0xF800, *nsdplayer->current++);
-				NES6502Write(0x4800, *nsdplayer->current++);
+				NES6502Write(pNezPlay, 0xF800, *nsdplayer->current++);
+				NES6502Write(pNezPlay, 0x4800, *nsdplayer->current++);
 				break;
 			case 0x37:
 				/* FME7 */
-				NES6502Write(0xC000, *nsdplayer->current++);
-				NES6502Write(0xE000, *nsdplayer->current++);
+				NES6502Write(pNezPlay, 0xC000, *nsdplayer->current++);
+				NES6502Write(pNezPlay, 0xE000, *nsdplayer->current++);
 				break;
 			case 0x3C:
 			case 0x3D:
 			case 0x3E:
 			case 0x3F:
-				NES6502Write(0x5FF0 + (c & 0x0F), *nsdplayer->current++);
+				NES6502Write(pNezPlay, 0x5FF0 + (c & 0x0F), *nsdplayer->current++);
 				break;
 			default:
 				if ((0x00 <= c && c <= 0x15) || (0x40 <= c && c <= 0x8F))
 				{
 					/* APU FDS */
-					NES6502Write(0x4000 + c, *nsdplayer->current++);
+					NES6502Write(pNezPlay, 0x4000 + c, *nsdplayer->current++);
 				}
 				else if (0x16 <= c && c <= 0x1E)
 				{
@@ -99,20 +95,21 @@ static Uint NSDPlayStep()
 					Uint32 adr, ch;
 					ch = (c - 0x16) / 3;
 					adr = 0x9000 + 0x1000 * ch + (c - 0x16) - 3 * ch;
-					NES6502Write(adr, *nsdplayer->current++);
+					NES6502Write(pNezPlay, adr, *nsdplayer->current++);
 				}
 				else if (0x20 <= c && c <= 0x35)
 				{
 					/* MMC5 */
-					NES6502Write(0x5000 + c - 0x20, *nsdplayer->current++);
+					NES6502Write(pNezPlay, 0x5000 + c - 0x20, *nsdplayer->current++);
 				}
 				break;
 		}
 	}
 }
 
-static void NSDPlayCycles(Uint32 syncs)
+static void NSDPlayCycles(NEZ_PLAY *pNezPlay, Uint32 syncs)
 {
+	NSDSEQ *nsdplayer = pNezPlay->nsdp;
 	Uint r = 0;
 	if (!nsdplayer->isplaying) return;
 	if (nsdplayer->remainsyncs > syncs)
@@ -123,17 +120,18 @@ static void NSDPlayCycles(Uint32 syncs)
 	syncs -= nsdplayer->remainsyncs;
 	do
 	{
-		r += NSDPlayStep();
+		r += NSDPlayStep(pNezPlay);
 	} while (nsdplayer->isplaying && r < syncs);
 	nsdplayer->remainsyncs = r - syncs;
 }
 
-static Int32 __fastcall ExecuteNSD(void)
+static Int32 __fastcall ExecuteNSD(void *pNezPlay)
 {
+	NSDSEQ *nsdplayer = ((NEZ_PLAY*)pNezPlay)->nsdp;
 	Uint32 cycles;
 	nsdplayer->cleft += nsdplayer->cps;
 	cycles = nsdplayer->cleft >> SHIFT_CPS;
-	if (!nsdplayer->sync0 && cycles) NSDPlayCycles(cycles);
+	if (!nsdplayer->sync0 && cycles) NSDPlayCycles(pNezPlay, cycles);
 	nsdplayer->cleft &= (1 << SHIFT_CPS) - 1;
 	if (nsdplayer->sync0)
 	{
@@ -141,7 +139,7 @@ static Int32 __fastcall ExecuteNSD(void)
 		if (nsdplayer->cpfc > nsdplayer->cpf)
 		{
 			nsdplayer->cpfc -= nsdplayer->cpf;
-			NSDPlayCycles(1);
+			NSDPlayCycles(pNezPlay, 1);
 		}
 	}
 	nsdplayer->total_cycles += cycles;
@@ -177,9 +175,12 @@ static Uint32 GetDwordLE(Uint8 *p)
 }
 
 
-static void __fastcall NSDPLAYReset()
+static void __fastcall NSDPLAYReset(void *vp)
 {
-	Uint freq = NESAudioFrequencyGet();
+	NEZ_PLAY *pNezPlay= (NEZ_PLAY*)vp;
+	
+	NSDSEQ *nsdplayer = pNezPlay->nsdp;
+	Uint freq = NESAudioFrequencyGet(pNezPlay);
 	nsdplayer->cleft = 0;
 	nsdplayer->cpfc = 0;
 	nsdplayer->remainsyncs = 0;
@@ -218,8 +219,9 @@ const static NES_RESET_HANDLER nsdplay_reset_handler[] = {
 	{ 0,                  0, },
 };
 
-static void __fastcall NSDPLAYTerminate()
+static void __fastcall NSDPLAYTerminate(void *pNezPlay)
 {
+	NSDSEQ *nsdplayer = ((NEZ_PLAY*)pNezPlay)->nsdp;
 	if (nsdplayer)
 	{
 		if (nsdplayer->top)
@@ -228,7 +230,7 @@ static void __fastcall NSDPLAYTerminate()
 			nsdplayer->top = 0;
 		}
 		XFREE(nsdplayer);
-		nsdplayer = 0;
+		((NEZ_PLAY*)pNezPlay)->nsdp = 0;
 	}
 }
 
@@ -237,8 +239,9 @@ const static NES_TERMINATE_HANDLER nsdplay_terminate_handler[] = {
 	{ 0, },
 };
 
-Uint NSDPlayerInstall(Uint8 *pData, Uint uSize)
+Uint NSDPlayerInstall(NEZ_PLAY *pNezPlay, Uint8 *pData, Uint uSize)
 {
+	NSDSEQ *nsdplayer = pNezPlay->nsdp;
 	nsdplayer->sync1 = pData[7];
 	nsdplayer->sync2 = GetDwordLE(pData + 0x08);
 	nsdplayer->top = XMALLOC(GetDwordLE(pData + 0x30));
@@ -253,35 +256,34 @@ Uint NSDPlayerInstall(Uint8 *pData, Uint uSize)
 	{
 		nsdplayer->loop = 0;
 	}
-	NESAudioHandlerInstall(nsdplay_audio_handler);
-	NESResetHandlerInstall(nsdplay_reset_handler);
-	NESTerminateHandlerInstall(nsdplay_terminate_handler);
-	NSDPLAYReset();
+	NESAudioHandlerInstall(pNezPlay, nsdplay_audio_handler);
+	NESResetHandlerInstall(pNezPlay->nrh, nsdplay_reset_handler);
+	NESTerminateHandlerInstall(&pNezPlay->nth, nsdplay_terminate_handler);
+	NSDPLAYReset(pNezPlay);
 	return NESERR_NOERROR;
 }
 
-Uint NSDLoad(Uint8 *pData, Uint uSize)
+Uint NSDLoad(NEZ_PLAY *pNezPlay, Uint8 *pData, Uint uSize)
 {
+	NSFNSF *nsf;
 	Uint ret;
-	nsfnsf = (NSFNSF *)XMALLOC(sizeof(NSFNSF));
-	if (!nsfnsf)
+	pNezPlay->nsf = nsf = (NSFNSF *)XMALLOC(sizeof(NSFNSF));
+	if (!pNezPlay->nsf)
 		return NESERR_SHORTOFMEMORY;
-	nsdplayer = (NSDSEQ *)XMALLOC(sizeof(NSDSEQ));
-	if (!nsdplayer) {
-		free(nsfnsf);
-		nsfnsf= 0;
+	pNezPlay->nsdp = (NSDSEQ *)XMALLOC(sizeof(NSDSEQ));
+	if (!pNezPlay->nsdp) {
+		free(pNezPlay->nsf);
+		pNezPlay->nsf = 0;
 		return NESERR_SHORTOFMEMORY;
 	}
-	NSFNSF *nsf= nsfnsf;
-	
-	NESMemoryHandlerInitialize();
+	NESMemoryHandlerInitialize(pNezPlay);
 	XMEMSET(nsf->head, 0, 0x80);
-	SONGINFO_SetStartSongNo(1);
-	SONGINFO_SetMaxSongNo(1);
-	SONGINFO_SetExtendDevice(pData[0x0C]);
-	SONGINFO_SetInitAddress(0);
-	SONGINFO_SetPlayAddress(0);
-	SONGINFO_SetChannel(1);
+	SONGINFO_SetStartSongNo(pNezPlay->song, 1);
+	SONGINFO_SetMaxSongNo(pNezPlay->song, 1);
+	SONGINFO_SetExtendDevice(pNezPlay->song, pData[0x0C]);
+	SONGINFO_SetInitAddress(pNezPlay->song, 0);
+	SONGINFO_SetPlayAddress(pNezPlay->song, 0);
+	SONGINFO_SetChannel(pNezPlay->song, 1);
 	if (GetDwordLE(pData + 0x28))
 	{
 		Uint8 *src = pData + GetDwordLE(pData + 0x28);
@@ -319,11 +321,11 @@ Uint NSDLoad(Uint8 *pData, Uint uSize)
 		nsf->banknum = 0;
 		nsf->bankbase = 0;
 	}
-	ret = NSDPlayerInstall(pData, uSize);
+	ret = NSDPlayerInstall(pNezPlay, pData, uSize);
 	if (ret) return ret;
-	ret = NSFDeviceInitialize();
+	ret = NSFDeviceInitialize(pNezPlay);
 	if (ret) return ret;
-	SONGINFO_SetSongNo(SONGINFO_GetStartSongNo());
+	SONGINFO_SetSongNo(pNezPlay->song, SONGINFO_GetStartSongNo(pNezPlay->song));
 	return NESERR_NOERROR;
 }
 

@@ -7,7 +7,7 @@
 extern "C" {
 #endif
 
-Uint ZXAYLoad(Uint8 *pData, Uint uSize);
+Uint ZXAYLoad(NEZ_PLAY*, Uint8 *pData, Uint uSize);
 
 #ifdef __cplusplus
 }

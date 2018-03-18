@@ -33,29 +33,19 @@ It supposedly emulates the following sound chips:
         Hudson    HES-PSG(HuC6280)             [PC-Engine(TG16)]
 
 
-This version should now play NSF and KSS, GBR, GBS, HES, AY and also SGC files.
-
 A live demo of this program can be found here: http://www.wothke.ch/webNEZ/
 
 
 ## Credits
-The project is based on: http://offgao.net/program/nezplug++.html and https://github.com/BouKiCHi/nezplay 
+The project is based on NEZplug++ 0.9.4.8 + 3 + 24.00: http://offgao.net/program/nezplug++.html
 
-
-## Project
-
-I had first used https://github.com/BouKiCHi/nezplay (NEZplug Version 0.9.5.3) - which worked 
-nicely out of the box (whereas NEZplug++ has CLANG issues).
-
-I later merged the NEZplug++ 0.9.4.8 + 3 + 24.00 (see http://offgao.net/program/nezplug++.html) 
-sources back into the functioning NEZplay, i.e. the codebase is now mainly NEZplug++ with little 
-remains of NEZplay glue code. The version information suggests that the code is now based on 
-a somewhat older NEZplug version (0.9.4.8 instead of 0.9.5.3) - but with extra "Sega Master System",
-"Game Gear","Coleco Vision" support. (eventhough 0.9.4.8 seems to be the most recent version
-according to http://nezplug.sourceforge.net/ ...)
-
-All the "Web" specific additions (i.e. the whole point of this project) are contained in the 
-"emscripten" subfolder.
+## Known limitations
+There seems to be some bug in the re-initialization logic: A .KSS song that plays perfectly fine 
+when played directly makes noises when played after *specific* types of other songs.
+Test case: 1) "battlestar galactica theme.kss" - 2 channel MSX stuff 2) then 
+"4th Unit 4 - Zero, The (MSX)(1990)(Data West).kss" - 1 channel MSX stuff 3) back to 1) that song
+no longer works. It seems some leftover garbage from the previous song is not properly 
+reinitialized when loading a new song in some corner of the emulation..
 
 
 ## Howto build

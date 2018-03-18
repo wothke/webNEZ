@@ -5,6 +5,7 @@
 #include "format/nsf6502.h"
 
 #include "logtable.h"
+#include "m_nsf.h"
 #include "s_vrc6.h"
 //#include <stdio.h>
 
@@ -50,11 +51,9 @@ typedef struct {
 /*  VRC6 SOUND  */
 /* ------------ */
 
-
-static VRC6SOUND vrc6s;
-
-static Int32 VRC6SoundSquareRender(VRC6_SQUARE *ch)
+static Int32 VRC6SoundSquareRender(void* pNezPlay, VRC6_SQUARE *ch)
 {
+	VRC6SOUND *vrc6s = ((NSFNSF*)((NEZ_PLAY*)pNezPlay)->nsf)->vrc6s;
 	Int32 outputbuf=0,count=0;
 	if (ch->update)
 	{
@@ -68,7 +67,7 @@ static Int32 VRC6SoundSquareRender(VRC6_SQUARE *ch)
 	if (ch->spd < (8 << CPS_SHIFT >> RENDERS)) return 0;
 
 	ch->cycles += ch->cps;
-	ch->output = LinearToLog(ch->regs[0] & 0x0F) + vrc6s.mastervolume;
+	ch->output = LinearToLog(ch->regs[0] & 0x0F) + vrc6s->mastervolume;
 	ch->output = LogToLinear(ch->output, LOG_LIN_BITS - LIN_BITS - 16 - 1);
 	ch->output *= (!(ch->regs[0] & 0x80) && (ch->adr < ((ch->regs[0] >> 4) + 1))) ? 0 : 1;
 	while (ch->cycles > 0)
@@ -81,13 +80,13 @@ static Int32 VRC6SoundSquareRender(VRC6_SQUARE *ch)
 
 		if(ch->ct >= (1<<RENDERS)){
 			ch->ct = 0;
-		ch->adr++;
+			ch->adr++;
 			ch->adr &= 0xF;
 
-			ch->output = LinearToLog(ch->regs[0] & 0x0F) + vrc6s.mastervolume;
+			ch->output = LinearToLog(ch->regs[0] & 0x0F) + vrc6s->mastervolume;
 			ch->output = LogToLinear(ch->output, LOG_LIN_BITS - LIN_BITS - 16 - 1);
 			ch->output *= (!(ch->regs[0] & 0x80) && (ch->adr < ((ch->regs[0] >> 4) + 1))) ? 0 : 1;
-	}
+		}
 	}
 	outputbuf += ch->output;
 	count++;
@@ -97,8 +96,9 @@ static Int32 VRC6SoundSquareRender(VRC6_SQUARE *ch)
 	return outputbuf /count;
 }
 
-static Int32 VRC6SoundSawRender(VRC6_SAW *ch)
+static Int32 VRC6SoundSawRender(void *pNezPlay, VRC6_SAW *ch)
 {
+	VRC6SOUND *vrc6s = ((NSFNSF*)((NEZ_PLAY*)pNezPlay)->nsf)->vrc6s;
 	Int32 outputbuf=0,count=0;
 
 	if (ch->update)
@@ -114,7 +114,7 @@ static Int32 VRC6SoundSawRender(VRC6_SAW *ch)
 
 	ch->cycles -= ch->cps << 6;
 
-	ch->outputbf = LinearToLog((ch->output >> 3) & 0x1F) + vrc6s.mastervolume;
+	ch->outputbf = LinearToLog((ch->output >> 3) & 0x1F) + vrc6s->mastervolume;
 	ch->outputbf = LogToLinear(ch->outputbf, LOG_LIN_BITS - LIN_BITS - 16 - 1);
 	while (ch->cycles < 0)
 	{
@@ -126,13 +126,13 @@ static Int32 VRC6SoundSawRender(VRC6_SAW *ch)
 
 		if(ch->ct >= (1<<6)){
 			ch->ct = 0;
-		ch->output += (ch->regs[0] & 0x3F);
-		if (7 == ++ch->adr)
-		{
-			ch->adr = 0;
-			ch->output = 0;
-		}
-			ch->outputbf = LinearToLog((ch->output >> 3) & 0x1F) + vrc6s.mastervolume;
+			ch->output += (ch->regs[0] & 0x3F);
+			if (7 == ++ch->adr)
+			{
+				ch->adr = 0;
+				ch->output = 0;
+			}
+			ch->outputbf = LinearToLog((ch->output >> 3) & 0x1F) + vrc6s->mastervolume;
 			ch->outputbf = LogToLinear(ch->outputbf, LOG_LIN_BITS - LIN_BITS - 16 - 1);
 		}
 	}
@@ -144,51 +144,56 @@ static Int32 VRC6SoundSawRender(VRC6_SAW *ch)
 	return outputbuf /count;
 }
 
-static Int32 __fastcall VRC6SoundRender(void)
+static Int32 __fastcall VRC6SoundRender(void* pNezPlay)
 {
+	VRC6SOUND *vrc6s = ((NSFNSF*)((NEZ_PLAY*)pNezPlay)->nsf)->vrc6s;
 	Int32 accum = 0;
-	accum += VRC6SoundSquareRender(&vrc6s.square[0]) * chmask[DEV_VRC6_SQ1];
-	accum += VRC6SoundSquareRender(&vrc6s.square[1]) * chmask[DEV_VRC6_SQ2];
-	accum += VRC6SoundSawRender(&vrc6s.saw) * chmask[DEV_VRC6_SAW];
+	accum += VRC6SoundSquareRender(pNezPlay, &vrc6s->square[0]) * chmask[DEV_VRC6_SQ1];
+	accum += VRC6SoundSquareRender(pNezPlay, &vrc6s->square[1]) * chmask[DEV_VRC6_SQ2];
+	accum += VRC6SoundSawRender(pNezPlay, &vrc6s->saw) * chmask[DEV_VRC6_SAW];
 	return accum;
 }
 
-static NES_AUDIO_HANDLER s_vrc6_audio_handler[] = {
+const static NES_AUDIO_HANDLER s_vrc6_audio_handler[] = {
 	{ 1, VRC6SoundRender, }, 
 	{ 0, 0, }, 
 };
 
-static void __fastcall VRC6SoundVolume(Uint volume)
+static void __fastcall VRC6SoundVolume(void* pNezPlay, Uint volume)
 {
+	VRC6SOUND *vrc6s = ((NSFNSF*)((NEZ_PLAY*)pNezPlay)->nsf)->vrc6s;
 	volume += 64;
-	vrc6s.mastervolume = (volume << (LOG_BITS - 8)) << 1;
+	vrc6s->mastervolume = (volume << (LOG_BITS - 8)) << 1;
 }
 
 const static NES_VOLUME_HANDLER s_vrc6_volume_handler[] = {
 	{ VRC6SoundVolume, },
 	{ 0, }, 
 };
-static void __fastcall VRC6SoundWrite9000(Uint address, Uint value)
+
+static void __fastcall VRC6SoundWrite9000(void *pNezPlay, Uint address, Uint value)
 {
 	//FILE *f;
 	if(address >=0x9000 && address <= 0x9002){//なして9010・9030書いたときもここ通ってんだべ？
-		vrc6s.square[0].regs[address & 3] = (Uint8)value;
-		vrc6s.square[0].update |= 1 << (address & 3); 
+		VRC6SOUND *vrc6s = ((NSFNSF*)((NEZ_PLAY*)pNezPlay)->nsf)->vrc6s;
+		vrc6s->square[0].regs[address & 3] = (Uint8)value;
+		vrc6s->square[0].update |= 1 << (address & 3); 
 	}
 	//f=fopen("R:\\debug.out","a+");
 	//fprintf(f,"%04X: %02X\r\n",address, value);
 	//fclose(f);
 }
-static void __fastcall VRC6SoundWriteA000(Uint address, Uint value)
+static void __fastcall VRC6SoundWriteA000(void *pNezPlay, Uint address, Uint value)
 {
-	vrc6s.square[1].regs[address & 3] = (Uint8)value;
-	vrc6s.square[1].update |= 1 << (address & 3); 
+	VRC6SOUND *vrc6s = ((NSFNSF*)((NEZ_PLAY*)pNezPlay)->nsf)->vrc6s;
+	vrc6s->square[1].regs[address & 3] = (Uint8)value;
+	vrc6s->square[1].update |= 1 << (address & 3); 
 }
-static void __fastcall VRC6SoundWriteB000(Uint address, Uint value)
+static void __fastcall VRC6SoundWriteB000(void *pNezPlay, Uint address, Uint value)
 {
-	vrc6s.saw.regs[address & 3] = (Uint8)value;
-	vrc6s.saw.update |= 1 << (address & 3); 
-
+	VRC6SOUND *vrc6s = ((NSFNSF*)((NEZ_PLAY*)pNezPlay)->nsf)->vrc6s;
+	vrc6s->saw.regs[address & 3] = (Uint8)value;
+	vrc6s->saw.update |= 1 << (address & 3); 
 }
 
 static NES_WRITE_HANDLER s_vrc6_write_handler[] =
@@ -217,31 +222,35 @@ static Uint32 DivFix(Uint32 p1, Uint32 p2, Uint32 fix)
 	return ret;
 }
 
-static void VRC6SoundSquareReset(VRC6_SQUARE *ch)
+static void VRC6SoundSquareReset(void *pNezPlay, VRC6_SQUARE *ch)
 {
-	ch->cps = DivFix(NES_BASECYCLES, 12 * NESAudioFrequencyGet(), CPS_SHIFT);
+	ch->cps = DivFix(NES_BASECYCLES, 12 * NESAudioFrequencyGet(pNezPlay), CPS_SHIFT);
 }
 
-static void VRC6SoundSawReset(VRC6_SAW *ch)
+static void VRC6SoundSawReset(void *pNezPlay, VRC6_SAW *ch)
 {
-	ch->cps = DivFix(NES_BASECYCLES, 24 * NESAudioFrequencyGet(), CPS_SHIFT);
+	ch->cps = DivFix(NES_BASECYCLES, 24 * NESAudioFrequencyGet(pNezPlay), CPS_SHIFT);
 }
 
-static void __fastcall VRC6SoundReset(void)
+static void __fastcall VRC6SoundReset(void* pNezPlay)
 {
-	XMEMSET(&vrc6s, 0, sizeof(VRC6SOUND));
-	VRC6SoundSquareReset(&vrc6s.square[0]);
-	VRC6SoundSquareReset(&vrc6s.square[1]);
-	VRC6SoundSawReset(&vrc6s.saw);
+	VRC6SOUND *vrc6s = ((NSFNSF*)((NEZ_PLAY*)pNezPlay)->nsf)->vrc6s;
+	XMEMSET(vrc6s, 0, sizeof(VRC6SOUND));
+	VRC6SoundSquareReset(pNezPlay, &vrc6s->square[0]);
+	VRC6SoundSquareReset(pNezPlay, &vrc6s->square[1]);
+	VRC6SoundSawReset(pNezPlay, &vrc6s->saw);
 }
 
-static NES_RESET_HANDLER s_vrc6_reset_handler[] = {
+const static NES_RESET_HANDLER s_vrc6_reset_handler[] = {
 	{ NES_RESET_SYS_NOMAL, VRC6SoundReset, }, 
 	{ 0,                   0, }, 
 };
 
-static void __fastcall VRC6SoundTerm()
+static void __fastcall VRC6SoundTerm(void* pNezPlay)
 {
+	VRC6SOUND *vrc6s = ((NSFNSF*)((NEZ_PLAY*)pNezPlay)->nsf)->vrc6s;
+	if (vrc6s)
+		XFREE(vrc6s);
 }
 
 const static NES_TERMINATE_HANDLER s_vrc6_terminate_handler[] = {
@@ -261,19 +270,25 @@ static Uint32 ioview_ioread_bf(Uint32 a){
 }
 //ここまでレジスタビュアー設定
 
-void VRC6SoundInstall(void)
+void VRC6SoundInstall(NEZ_PLAY *pNezPlay)
 {
-	XMEMSET(&vrc6s, 0, sizeof(VRC6SOUND));
+	VRC6SOUND *vrc6s;
+	vrc6s = XMALLOC(sizeof(VRC6SOUND));
+	if (!vrc6s) return;
+	XMEMSET(vrc6s, 0, sizeof(VRC6SOUND));
+	((NSFNSF*)pNezPlay->nsf)->vrc6s = vrc6s;
+
 	LogTableInitialize();
-	NESAudioHandlerInstall(s_vrc6_audio_handler);
-	NESVolumeHandlerInstall(s_vrc6_volume_handler);
-	NESWriteHandlerInstall(s_vrc6_write_handler);
-	NESResetHandlerInstall(s_vrc6_reset_handler);
-	NESResetHandlerInstall(s_vrc6_reset_handler);
+	NESAudioHandlerInstall(pNezPlay, s_vrc6_audio_handler);
+	NESVolumeHandlerInstall(pNezPlay, s_vrc6_volume_handler);
+	NESTerminateHandlerInstall(&pNezPlay->nth, s_vrc6_terminate_handler);
+	NESWriteHandlerInstall(pNezPlay, s_vrc6_write_handler);
+	NESResetHandlerInstall(pNezPlay->nrh, s_vrc6_reset_handler);
+
 	//ここからレジスタビュアー設定
-	vrc6_regdata  = vrc6s.square[0].regs;
-	vrc6_regdata2 = vrc6s.square[1].regs;
-	vrc6_regdata3 = vrc6s.saw.regs;
+	vrc6_regdata  = vrc6s->square[0].regs;
+	vrc6_regdata2 = vrc6s->square[1].regs;
+	vrc6_regdata3 = vrc6s->saw.regs;
 	ioview_ioread_DEV_VRC6 = ioview_ioread_bf;
 	//ここまでレジスタビュアー設定
 }

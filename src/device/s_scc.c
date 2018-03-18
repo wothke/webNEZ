@@ -54,7 +54,7 @@ __inline static Int32 SCCSoundChSynth(SCCSOUND *sndp, SCC_CH *ch)
 		ch->count++;
 		if(ch->count >= 1<<RENDERS){
 			ch->count = 0;
-		ch->adr++;
+			ch->adr++;
 			ch->output = LogToLin(sndp->logtbl, ch->volume + sndp->common.mastervolume + ch->tone[ch->adr & 0x1F], LOG_LIN_BITS - LIN_BITS - LIN_BITS - 9);
 		}
 	}
@@ -161,9 +161,9 @@ static void sndrelease(void *ctx)
 {
 	SCCSOUND *sndp = ctx;
 	if (sndp) {
-	if (sndp->logtbl) sndp->logtbl->release(sndp->logtbl->ctx);
-	XFREE(sndp);
-}
+		if (sndp->logtbl) sndp->logtbl->release(sndp->logtbl->ctx);
+		XFREE(sndp);
+	}
 }
 
 static void setinst(void *ctx, Uint32 n, void *p, Uint32 l){}

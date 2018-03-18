@@ -7,7 +7,7 @@
 extern "C" {
 #endif
 
-Uint32 KSSLoad(Uint8 *pData, Uint uSize);
+Uint32 KSSLoad(NEZ_PLAY *, Uint8 *pData, Uint uSize);
 
 #ifdef __cplusplus
 }

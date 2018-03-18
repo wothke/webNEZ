@@ -7,8 +7,8 @@
 extern "C" {
 #endif
 
-typedef void (__fastcall *RESETHANDLER)(void);
-typedef void (__fastcall *TERMINATEHANDLER)(void);
+typedef void (__fastcall *RESETHANDLER)(void*);
+typedef void (__fastcall *TERMINATEHANDLER)(void*);
 
 typedef struct NES_RESET_HANDLER_TAG {
 	Uint priority;	/* 0(first) - 15(last) */
@@ -24,11 +24,12 @@ typedef struct NES_TERMINATE_HANDLER_TAG {
 	struct NES_TERMINATE_HANDLER_TAG *next;
 } NES_TERMINATE_HANDLER;
 
-void NESReset(void);
-void NESResetHandlerInstall(NES_RESET_HANDLER *ph);
-void NESTerminate(void);
-void NESTerminateHandlerInstall(NES_TERMINATE_HANDLER *ph);
-void NESHandlerInitialize(void);
+void NESReset(void*);
+void NESResetHandlerInstall(NES_RESET_HANDLER**, const NES_RESET_HANDLER *ph);
+void NESTerminate(void*);
+void NESTerminateHandlerInstall(NES_TERMINATE_HANDLER**, const NES_TERMINATE_HANDLER *ph);
+void NESHandlerInitialize(NES_RESET_HANDLER**, NES_TERMINATE_HANDLER *);
+void NESHandlerTerminate(NES_RESET_HANDLER**, NES_TERMINATE_HANDLER *);
 
 #ifdef __cplusplus
 }

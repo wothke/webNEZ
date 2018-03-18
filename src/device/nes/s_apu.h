@@ -5,7 +5,8 @@
 extern "C" {
 #endif
 
-void APUSoundInstall(void);
+void APUSoundInstall(NEZ_PLAY *);
+
 
 #ifdef __cplusplus
 }

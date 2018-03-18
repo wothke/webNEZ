@@ -5,7 +5,7 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-    
+
 #include "../nestypes.h"
 
 typedef struct {
@@ -106,3 +106,5 @@ extern Uint8 chmask[0x80];
 }
 #endif
 #endif /* KMSNDDEV_H__ */
+
+

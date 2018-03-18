@@ -84,7 +84,7 @@ __inline static Int32 SNGSoundSquareSynth(SNGSOUND *sndp, SNG_SQUARE *ch)
 		ch->count++;
 		if(ch->count >= 1<<RENDERS){
 			ch->count = 0;
-		ch->adr++;
+			ch->adr++;
 			ch->output = LogToLin(sndp->logtbl, ch->vol + sndp->common.mastervolume, LOG_LIN_BITS - 21);
 			ch->output *= !(ch->adr & 1);
 		}
@@ -111,13 +111,13 @@ __inline static Int32 SNGSoundNoiseSynth(SNGSOUND *sndp, SNG_NOISE *ch)
 		ch->count++;
 		if(ch->count >= 1<<NOISE_RENDERS){
 			ch->count = 0;
-		if (ch->rng & 1) ch->rng ^= ch->fb;
+			if (ch->rng & 1) ch->rng ^= ch->fb;
 			//ch->rng += ch->rng + (((ch->rng >> ch->step1)/* ^ (ch->rng >> ch->step2)*/) & 1);
-		ch->rng >>= 1;
+			ch->rng >>= 1;
 
 			ch->output = LogToLin(sndp->logtbl, ch->vol + sndp->common.mastervolume, LOG_LIN_BITS - 21);
 			ch->output *= !(ch->rng & 1);
-	}
+		}
 	}
 	outputbuf += ch->output;
 	count++;
@@ -259,9 +259,9 @@ static void sndrelease(void *ctx)
 {
 	SNGSOUND *sndp = (SNGSOUND*)ctx;
 	if (sndp) {
-	if (sndp->logtbl) sndp->logtbl->release(sndp->logtbl->ctx);
-	XFREE(sndp);
-}
+		if (sndp->logtbl) sndp->logtbl->release(sndp->logtbl->ctx);
+		XFREE(sndp);
+	}
 }
 
 static void setinst(void *ctx, Uint32 n, void *p, Uint32 l){}

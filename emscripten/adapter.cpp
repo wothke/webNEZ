@@ -43,11 +43,10 @@
 #include <iostream>
 #include <fstream>
 
-#include <handler.h>
-#include <nezglue_x.h>
+//#include <handler.h>
+#include <nezplug.h>
 #include <audiosys.h>
 #include <songinfo.h>
-#include <m_nsf.h>
 
 
 #ifdef EMSCRIPTEN
@@ -55,16 +54,6 @@
 #else
 #define EMSCRIPTEN_KEEPALIVE
 #endif
-
-extern "C" Uint NEZLoad(Uint8 *pData, Uint uSize);
-
-Uint8 chmask[0x80]={
-1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-};
-
 
 std::string trim(const std::string& str) {
     size_t first = str.find_first_not_of(' ');
@@ -92,23 +81,25 @@ char track_str[TEXT_MAX];
 char artist_str[TEXT_MAX];
 char copyright_str[TEXT_MAX];
 
+NEZ_PLAY *nezPlay= NULL;
+
 struct StaticBlock {
     StaticBlock(){
 		info_texts[0]= title_str;
 		info_texts[1]= track_str;
 		info_texts[2]= artist_str;
-		info_texts[3]= copyright_str;
+		info_texts[3]= copyright_str;		
     }
 };
 
 static StaticBlock g_emscripen_info;
 
-void* buffer_copy= NULL;
+void* buffer_copy= 0;
 
 void trash_buffer_copy() {
 	if (buffer_copy) {
 		free(buffer_copy);
-		buffer_copy= NULL;		
+		buffer_copy= 0;		
 	}
 }
 
@@ -122,34 +113,46 @@ void * get_buffer_copy(const void * inBuffer, size_t inBufSize) {
 
 extern "C" void emu_teardown (void)  __attribute__((noinline));
 extern "C" void EMSCRIPTEN_KEEPALIVE emu_teardown (void) {
-	trash_buffer_copy();
-		
-    NESTerminate();
+	if (nezPlay != NULL) {
+		NEZDelete(nezPlay);
+		nezPlay= NULL;		
+	}
 }
 
-
-NSF_STATE nsf_state;
+extern int NSF_noise_random_reset;
+extern int NSF_2A03Type;
+extern int Namco106_Realmode;
+extern int Namco106_Volume;
+extern int GBAMode;
+extern int MSXPSGType;
+extern int MSXPSGVolume;
+extern int FDS_RealMode;
+extern int LowPassFilterLevel;
+extern int NESAPUVolume;
+extern int NESRealDAC;
+extern int Always_stereo;
 
 int emu_setup()
 {
-   // NESAudioSetStrict(1);	// what might this be for?
-    NESReset();        
+	nezPlay= NEZNew();	// defaults: frequency = 48000; channel = 1; naf_type = NES_AUDIO_FILTER_NONE;
+
+	NEZSetFrequency(nezPlay, SAMPLE_FREQ);
+	NEZSetChannel(nezPlay, CHANNELS);
+
+	NSF_noise_random_reset = 0;
+	NSF_2A03Type= 1;
+	Namco106_Realmode= 1;
+	Namco106_Volume= 16;
+	GBAMode= 0;
+	MSXPSGType= 1;
+	MSXPSGVolume= 64;
+	FDS_RealMode= 3;
+	LowPassFilterLevel= 16; 
+	NESAPUVolume= 64; 
+	NESRealDAC = 1;
+	Always_stereo= 1;
+
 	return 1;
-}
-
-/*
-static int nsf_volume = 0;
-
-void SetVolumeNSF(int vol)
-{
-    nsf_volume = vol;
-    NESVolume( nsf_volume );    
-}
-*/
-void ResetNSF(void)
-{
-	NESReset();        
-//	NESVolume( nsf_volume );
 }
 
 extern "C"  int emu_load_file(char *filename, void * inBuffer, uint32_t inBufSize)  __attribute__((noinline));
@@ -159,24 +162,19 @@ extern "C"  int EMSCRIPTEN_KEEPALIVE emu_load_file(char *filename, void * inBuff
 	inBuffer= get_buffer_copy(inBuffer, inBufSize);
 
 	if (emu_setup()) {
-		SONGINFO_Reset();	// e.g. HES does not set anything..
+		SONGINFO_Reset(nezPlay->song);	// e.g. HES does not set anything..
 		
-		if (!NEZLoad((uint8_t *)inBuffer, inBufSize)) {
+		if (!NEZLoad(nezPlay, (uint8_t *)inBuffer, inBufSize)) {
 			
-			NESAudioFrequencySet(SAMPLE_FREQ);
-			NESAudioChannelSet(CHANNELS);
-		
-			ResetNSF();
-
-			std::string title= SONGINFO_GetTitle();
+			std::string title= SONGINFO_GetTitle(nezPlay->song);
 			if (title.length() == 0) {
 				title= filename;
 				title.erase( title.find_last_of( '.' ) );	// remove ext
 			}			
 			snprintf(title_str, TEXT_MAX, "%s", title.c_str());
 			
-			snprintf(artist_str, TEXT_MAX, "%s", trim(SONGINFO_GetArtist()).c_str());
-			snprintf(copyright_str, TEXT_MAX, "%s", trim(SONGINFO_GetCopyright()).c_str());
+			snprintf(artist_str, TEXT_MAX, "%s", trim(SONGINFO_GetArtist(nezPlay->song)).c_str());
+			snprintf(copyright_str, TEXT_MAX, "%s", trim(SONGINFO_GetCopyright(nezPlay->song)).c_str());
 			
 			return 0;		
 		}
@@ -194,14 +192,17 @@ extern "C" EMSCRIPTEN_KEEPALIVE int emu_get_sample_rate()
  
 extern "C" int emu_set_subsong(int subsong, unsigned char boost) __attribute__((noinline));
 extern "C" int EMSCRIPTEN_KEEPALIVE emu_set_subsong(int track, unsigned char boost) {
-	// .hes files to contain multiple tracks but used IDs are not obvious
+	// .hes files do contain multiple tracks but used IDs are not obvious
 	
 	if (track >= 0) {
-		SONGINFO_SetSongNo( track );
+		NEZSetSongNo(nezPlay, track );
 	}
-	ResetNSF();
+	NEZReset(nezPlay);		// without this there is no sound..
+	
+//	NEZSetFrequency(nezPlay, SAMPLE_FREQ);
+//	NEZSetChannel(nezPlay, CHANNELS);
 
-	track=  SONGINFO_GetSongNo();	// also read default when not set explicitly
+	track=  NEZGetSongNo(nezPlay);	// also read default when not set explicitly
 
 	snprintf(track_str, TEXT_MAX, "%d", track);
 
@@ -225,7 +226,7 @@ extern "C" long EMSCRIPTEN_KEEPALIVE emu_get_audio_buffer_length(void) {
 
 extern "C" int emu_compute_audio_samples() __attribute__((noinline));
 extern "C" int EMSCRIPTEN_KEEPALIVE emu_compute_audio_samples() {
-	NESAudioRender( sample_buffer, SAMPLE_BUF_SIZE );
+	NEZRender(nezPlay, sample_buffer, SAMPLE_BUF_SIZE);
 	samples_available= SAMPLE_BUF_SIZE;
 	
 	return 0;
@@ -233,31 +234,15 @@ extern "C" int EMSCRIPTEN_KEEPALIVE emu_compute_audio_samples() {
 
 extern "C" int emu_get_current_position() __attribute__((noinline));
 extern "C" int EMSCRIPTEN_KEEPALIVE emu_get_current_position() {
-    return NESGetFrame();
+    return -1; // not implemented
 }
 
 extern "C" void emu_seek_position(int pos) __attribute__((noinline));
 extern "C" void EMSCRIPTEN_KEEPALIVE emu_seek_position(int frames) {
-//	NESGetFramePerSeconds() NESGetFrameCycle();  
-	
-    int current = NESGetFrame();
-    
-    // if negative, seek is cancelled
-    if (frames < 0)
-    {
-        NESSeekFrame(current);
-        return;
-    }
-    
-    // reset if the frame is passed
-    if (frames < current)
-        ResetNSF();
-    
-    NESSeekFrame(frames);
 }
 
 extern "C" int emu_get_max_position() __attribute__((noinline));
 extern "C" int EMSCRIPTEN_KEEPALIVE emu_get_max_position() {
-	return NESGetMaxPosition();
+	return -1; // not implemented
 }
 

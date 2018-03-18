@@ -7,7 +7,7 @@
 extern "C" {
 #endif
 
-Uint NSDLoad(Uint8 *pData, Uint uSize);
+Uint NSDLoad(NEZ_PLAY*, Uint8 *pData, Uint uSize);
 
 #ifdef __cplusplus
 }
