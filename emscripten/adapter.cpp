@@ -49,12 +49,6 @@
 #include <songinfo.h>
 
 
-#ifdef EMSCRIPTEN
-#define EMSCRIPTEN_KEEPALIVE __attribute__((used))
-#else
-#define EMSCRIPTEN_KEEPALIVE
-#endif
-
 std::string trim(const std::string& str) {
     size_t first = str.find_first_not_of(' ');
     if (std::string::npos == first) {
@@ -73,13 +67,14 @@ std::string trim(const std::string& str) {
 int16_t sample_buffer[SAMPLE_BUF_SIZE * CHANNELS];
 int samples_available= 0;
 
-char* info_texts[4];
+char* info_texts[5];
 
 #define TEXT_MAX	255
 char title_str[TEXT_MAX];
 char track_str[TEXT_MAX];
 char artist_str[TEXT_MAX];
 char copyright_str[TEXT_MAX];
+char max_track_str[TEXT_MAX];
 
 NEZ_PLAY *nezPlay= NULL;
 
@@ -89,6 +84,7 @@ struct StaticBlock {
 		info_texts[1]= track_str;
 		info_texts[2]= artist_str;
 		info_texts[3]= copyright_str;		
+		info_texts[4]= max_track_str;		
     }
 };
 
@@ -175,7 +171,10 @@ extern "C"  int EMSCRIPTEN_KEEPALIVE emu_load_file(char *filename, void * inBuff
 			
 			snprintf(artist_str, TEXT_MAX, "%s", trim(SONGINFO_GetArtist(nezPlay->song)).c_str());
 			snprintf(copyright_str, TEXT_MAX, "%s", trim(SONGINFO_GetCopyright(nezPlay->song)).c_str());
-			
+
+			snprintf(track_str, TEXT_MAX, "%d", NEZGetSongStart(nezPlay));
+			snprintf(max_track_str, TEXT_MAX, "%d", NEZGetSongMax(nezPlay));
+
 			return 0;		
 		}
 	} else {
@@ -198,13 +197,15 @@ extern "C" int EMSCRIPTEN_KEEPALIVE emu_set_subsong(int track, unsigned char boo
 		NEZSetSongNo(nezPlay, track );
 	}
 	NEZReset(nezPlay);		// without this there is no sound..
-	
+
+	std::string title= SONGINFO_GetTitle(nezPlay->song);	// AY EMUL tracks have names
+	snprintf(title_str, TEXT_MAX, "%s", title.c_str());
+
 //	NEZSetFrequency(nezPlay, SAMPLE_FREQ);
 //	NEZSetChannel(nezPlay, CHANNELS);
 
-	track=  NEZGetSongNo(nezPlay);	// also read default when not set explicitly
-
-	snprintf(track_str, TEXT_MAX, "%d", track);
+//	track=  NEZGetSongStart(nezPlay);	// also read default when not set explicitly
+//	snprintf(track_str, TEXT_MAX, "%d", track);
 
 	return 0;
 }

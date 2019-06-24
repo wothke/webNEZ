@@ -187,7 +187,6 @@ static Uint8 *ZXAYOffset(Uint8 *p)
 	Uint32 ofs = GetWordBE(p) ^ 0x8000;
 	return p + ofs - 0x8000;
 }
-
 static void reset(NEZ_PLAY *pNezPlay)
 {
 	ZXAY *THIS_ = pNezPlay->zxay;
@@ -198,6 +197,17 @@ static void reset(NEZ_PLAY *pNezPlay)
 	song = SONGINFO_GetSongNo(pNezPlay->song) - 1;
 	if (song >= THIS_->maxsong) song = THIS_->startsong - 1;
 
+#ifdef EMSCRIPTEN
+	// get song title
+	Uint16 u= ((Uint16)THIS_->data[0x12] << 8) +THIS_->data[0x13];			//+18 tab PTR
+	Int16 songtab_ptr= *((Int16*)(&u));
+
+	Uint8 *song_struct= &THIS_->data[0x12] + songtab_ptr + (song << 2);
+
+	u= ((Uint16)song_struct[0x0] << 8) +song_struct[0x1];
+	Int16 songname_ptr= *((Int16*)(&u));
+	SONGINFO_SetTitle(pNezPlay->song, song_struct + songname_ptr);
+#endif
 	/* sound reset */
 	THIS_->sndp->reset(THIS_->sndp->ctx, ZX_BASECYCLES, freq);
 	THIS_->amstrad_sndp->reset(THIS_->amstrad_sndp->ctx, AMSTRAD_BASECYCLES, freq);
@@ -353,6 +363,13 @@ static Uint32 load(NEZ_PLAY *pNezPlay, ZXAY *THIS_, Uint8 *pData, Uint32 uSize)
 	THIS_->maxsong = pData[0x10] + 1;
 	THIS_->startsong = pData[0x11] + 1;
 
+#ifdef EMSCRIPTEN
+	// get composer info - same for all tracks
+	Uint16 u= ((Uint16)THIS_->data[0x0c] << 8) +THIS_->data[0x0d];	//+12 creator PTR
+	Int16 ptr= *((Int16*)(&u));										// is signed
+	char *creator= &THIS_->data[0x0c] + ptr;
+	SONGINFO_SetArtist(pNezPlay->song, creator);
+#endif
 	SONGINFO_SetStartSongNo(pNezPlay->song, THIS_->startsong);
 	SONGINFO_SetMaxSongNo(pNezPlay->song, THIS_->maxsong);
 	SONGINFO_SetExtendDevice(pNezPlay->song, 0);

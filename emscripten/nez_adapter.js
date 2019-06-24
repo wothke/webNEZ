@@ -100,8 +100,8 @@ NEZBackendAdapter = (function(){ var $this = function () {
 			} else {
 				ScriptNodePlayer.getInstance().setPlaybackTimeout(-1);	// reset last songs setting
 			}
-			var id= (options && options.track) ? options.track : -1;	// by default do not set track		
-			var boostVolume= (options && options.boostVolume) ? options.boostVolume : 0;		
+			var id= (options && options.track) ? options.track : -1;	// by default do not set track
+			var boostVolume= (options && options.boostVolume) ? options.boostVolume : 0;
 			return this.Module.ccall('emu_set_subsong', 'number', ['number', 'number'], [id, boostVolume]);
 		},				
 		teardown: function() {
@@ -112,17 +112,20 @@ NEZBackendAdapter = (function(){ var $this = function () {
 					track: String, 
 					artist: String, 
 					copyright: String, 
+					tracks: String
 					};
 		},
 		
 		updateSongInfo: function(filename, result) {
-			var numAttr= 4;
+			var numAttr= 5;
 			var ret = this.Module.ccall('emu_get_track_info', 'number');
 
 			var array = this.Module.HEAP32.subarray(ret>>2, (ret>>2)+numAttr);
 			result.title= this.Module.Pointer_stringify(array[0]);
+			if (!result.title.length) result.title= filename.replace(/^.*[\\\/]/, '').split('.').slice(0, -1).join('.');
 			result.track= this.Module.Pointer_stringify(array[1]);		
 			result.artist= this.Module.Pointer_stringify(array[2]);		
 			result.copyright= this.Module.Pointer_stringify(array[3]);		
+			result.tracks= this.Module.Pointer_stringify(array[4]);
 		}
 	});	return $this; })();
