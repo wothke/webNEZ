@@ -624,6 +624,28 @@ static void NSFMapperSetInfo(NEZ_PLAY *pNezPlay, Uint8 *pData)
 	songinfodata.copyright=copyrightbuffer;
 	SONGINFO_SetCopyright(pNezPlay->song, copyrightbuffer);
 	sprintf(songinfodata.detail,
+#ifdef EMSCRIPTEN
+"Type          : NSF<br>\r\n\
+Song Max      : %d<br>\r\n\
+Start Song    : %d<br>\r\n\
+Load Address  : %04XH<br>\r\n\
+Init Address  : %04XH<br>\r\n\
+Play Address  : %04XH<br>\r\n\
+NTSC/PAL Mode : %s<br>\r\n\
+NTSC Speed    : %04XH (%4.0fHz)<br>\r\n\
+PAL Speed     : %04XH (%4.0fHz)<br>\r\n\
+Extend Device : %s%s%s%s%s%s%s<br>\r\n\
+<br>\r\n\
+Set First ROM Bank                    : %d<br>\r\n\
+First ROM Bank(8000-8FFF)             : %02XH<br>\r\n\
+First ROM Bank(9000-9FFF)             : %02XH<br>\r\n\
+First ROM Bank(A000-AFFF)             : %02XH<br>\r\n\
+First ROM Bank(B000-BFFF)             : %02XH<br>\r\n\
+First ROM Bank(C000-CFFF)             : %02XH<br>\r\n\
+First ROM Bank(D000-DFFF)             : %02XH<br>\r\n\
+First ROM Bank(E000-EFFF or 6000-6FFF): %02XH<br>\r\n\
+First ROM Bank(F000-FFFF or 7000-7FFF): %02XH"
+#else
 "Type          : NSF\r\n\
 Song Max      : %d\r\n\
 Start Song    : %d\r\n\
@@ -644,6 +666,7 @@ First ROM Bank(C000-CFFF)             : %02XH\r\n\
 First ROM Bank(D000-DFFF)             : %02XH\r\n\
 First ROM Bank(E000-EFFF or 6000-6FFF): %02XH\r\n\
 First ROM Bank(F000-FFFF or 7000-7FFF): %02XH"
+#endif
 		,pData[0x06],pData[0x07],GetWordLE(pData + 0x08),GetWordLE(pData + 0x0A),GetWordLE(pData + 0x0C)
 		,pData[0x7A]&0x02 ? "NTSC + PAL" : pData[0x7A]&0x01 ? "PAL" : "NTSC"
 		,GetWordLE(pData + 0x6E),GetWordLE(pData + 0x6E) ? 1000000.0/GetWordLE(pData + 0x6E) : 0
@@ -658,6 +681,7 @@ First ROM Bank(F000-FFFF or 7000-7FFF): %02XH"
 		,pData[0x70]|pData[0x71]|pData[0x72]|pData[0x73]|pData[0x74]|pData[0x75]|pData[0x76]|pData[0x77] ? 1 : 0
 		,pData[0x70],pData[0x71],pData[0x72],pData[0x73],pData[0x74],pData[0x75],pData[0x76],pData[0x77]
 	);
+	SONGINFO_SetDetail(pNezPlay->song, songinfodata.detail);	// EMSCRIPTEN	
 }
 
 Uint NSFLoad(NEZ_PLAY *pNezPlay, Uint8 *pData, Uint uSize)

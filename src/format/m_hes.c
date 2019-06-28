@@ -650,6 +650,19 @@ static Uint32 load(NEZ_PLAY *pNezPlay, HESHES *THIS_, Uint8 *pData, Uint32 uSize
 	SONGINFO_SetPlayAddress(pNezPlay->song, 0);
 
 	sprintf(songinfodata.detail,
+#ifdef EMSCRIPTEN
+"Type           : HES<br>\r\n\
+Start Song     : %02XH<br>\r\n\
+Init Address   : %04XH<br>\r\n\
+First Mapper 0 : %02XH<br>\r\n\
+First Mapper 1 : %02XH<br>\r\n\
+First Mapper 2 : %02XH<br>\r\n\
+First Mapper 3 : %02XH<br>\r\n\
+First Mapper 4 : %02XH<br>\r\n\
+First Mapper 5 : %02XH<br>\r\n\
+First Mapper 6 : %02XH<br>\r\n\
+First Mapper 7 : %02XH"
+#else
 "Type           : HES\r\n\
 Start Song     : %02XH\r\n\
 Init Address   : %04XH\r\n\
@@ -661,6 +674,7 @@ First Mapper 4 : %02XH\r\n\
 First Mapper 5 : %02XH\r\n\
 First Mapper 6 : %02XH\r\n\
 First Mapper 7 : %02XH"
+#endif
 		,pData[5],THIS_->initaddr
 		,pData[0x8]
 		,pData[0x9]
@@ -671,6 +685,8 @@ First Mapper 7 : %02XH"
 		,pData[0xe]
 		,pData[0xf]
 		);
+
+	SONGINFO_SetDetail(pNezPlay->song, songinfodata.detail);	// EMSCRIPTEN
 
 	if (!alloc_physical_address(THIS_, 0xf8 << 13, 0x2000))	/* RAM */
 		return NESERR_SHORTOFMEMORY;

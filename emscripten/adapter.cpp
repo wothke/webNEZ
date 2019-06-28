@@ -67,7 +67,7 @@ std::string trim(const std::string& str) {
 int16_t sample_buffer[SAMPLE_BUF_SIZE * CHANNELS];
 int samples_available= 0;
 
-char* info_texts[5];
+char* info_texts[6];
 
 #define TEXT_MAX	255
 char title_str[TEXT_MAX];
@@ -75,6 +75,7 @@ char track_str[TEXT_MAX];
 char artist_str[TEXT_MAX];
 char copyright_str[TEXT_MAX];
 char max_track_str[TEXT_MAX];
+char detail_str[TEXT_MAX*4];
 
 NEZ_PLAY *nezPlay= NULL;
 
@@ -85,6 +86,7 @@ struct StaticBlock {
 		info_texts[2]= artist_str;
 		info_texts[3]= copyright_str;		
 		info_texts[4]= max_track_str;		
+		info_texts[5]= detail_str;		
     }
 };
 
@@ -174,6 +176,8 @@ extern "C"  int EMSCRIPTEN_KEEPALIVE emu_load_file(char *filename, void * inBuff
 
 			snprintf(track_str, TEXT_MAX, "%d", NEZGetSongStart(nezPlay));
 			snprintf(max_track_str, TEXT_MAX, "%d", NEZGetSongMax(nezPlay));
+			
+			snprintf(detail_str, TEXT_MAX*4, "%s", SONGINFO_GetDetail(nezPlay->song));
 
 			return 0;		
 		}

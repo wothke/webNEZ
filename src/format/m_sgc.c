@@ -589,6 +589,32 @@ static Uint32 load(NEZ_PLAY *pNezPlay, SGCSEQ *THIS_, Uint8 *pData, Uint32 uSize
 //	SONGINFO_SetExtendDevice(pNezPlay->song, THIS_->extdevice << 8);
 
 	sprintf(songinfodata.detail,
+#ifdef EMSCRIPTEN
+"Type          : SGC<br>\r\n\
+System        : %s<br>\r\n\
+Song Max      : %d<br>\r\n\
+Start Song    : %d<br>\r\n\
+First SE      : %d<br>\r\n\
+Last SE       : %d<br>\r\n\
+Load Address  : %04XH<br>\r\n\
+Init Address  : %04XH<br>\r\n\
+Play Address  : %04XH<br>\r\n\
+Stack Address : %04XH<br>\r\n\
+Clock Mode    : %s<br>\r\n\
+<br>\r\n\
+RST 08H ADR   : %04XH<br>\r\n\
+RST 10H ADR   : %04XH<br>\r\n\
+RST 18H ADR   : %04XH<br>\r\n\
+RST 20H ADR   : %04XH<br>\r\n\
+RST 28H ADR   : %04XH<br>\r\n\
+RST 30H ADR   : %04XH<br>\r\n\
+RST 38H ADR   : %04XH<br>\r\n\
+<br>\r\n\
+First ROM Bank(0400-3FFF): %02XH<br>\r\n\
+First ROM Bank(4000-7FFF): %02XH<br>\r\n\
+First ROM Bank(8000-BFFF): %02XH<br>\r\n\
+RAM Bank      (8000-BFFF): %d"
+#else
 "Type          : SGC\r\n\
 System        : %s\r\n\
 Song Max      : %d\r\n\
@@ -614,6 +640,7 @@ First ROM Bank(4000-7FFF): %02XH\r\n\
 First ROM Bank(8000-BFFF): %02XH\r\n\
 RAM Bank      (8000-BFFF): %d\r\n\
 "
+#endif
 		,system_name[THIS_->systype]
 		,THIS_->maxsong
 		,THIS_->startsong
@@ -633,6 +660,7 @@ RAM Bank      (8000-BFFF): %d\r\n\
 		,THIS_->mappernum[3]
 		,THIS_->mappernum[0]&0x8 ? 1:0
 	);
+	SONGINFO_SetDetail(pNezPlay->song, songinfodata.detail);	// EMSCRIPTEN	
 
 	XMEMSET(titlebuffer, 0, 0x21);
 	XMEMCPY(titlebuffer, pData + 0x0040, 0x20);

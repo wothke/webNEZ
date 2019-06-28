@@ -21,6 +21,7 @@ typedef struct SONG_INFO_TAG
     char title[128];
     char artist[128];	
     char copyright[128];
+    char detail[1024];
 } SONG_INFO;
 
 SONG_INFO* SONGINFO_New();
@@ -46,6 +47,10 @@ void SONGINFO_SetArtist(SONG_INFO*,const char *artist);
 char *SONGINFO_GetArtist(SONG_INFO*);
 void SONGINFO_SetCopyright(SONG_INFO*, const char *copyright);
 char *SONGINFO_GetCopyright(SONG_INFO*);
+#ifdef EMSCRIPTEN
+void SONGINFO_SetDetail(SONG_INFO*, const char *detail);
+char *SONGINFO_GetDetail(SONG_INFO*);
+#endif
 void SONGINFO_Reset(SONG_INFO*);
 
 #ifdef __cplusplus

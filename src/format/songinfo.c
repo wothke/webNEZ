@@ -113,8 +113,22 @@ char *SONGINFO_GetCopyright(SONG_INFO *info)
 {
     return info->copyright;
 }
+
+#ifdef EMSCRIPTEN
+void SONGINFO_SetDetail(SONG_INFO *info,const char *detail)
+{
+    strcpy(info->detail, detail);
+}
+
+char *SONGINFO_GetDetail(SONG_INFO *info)
+{
+    return info->detail;
+}
+#endif
+
 void SONGINFO_Reset(SONG_INFO *info) {
 	SONGINFO_SetTitle(info, "");
 	SONGINFO_SetArtist(info, "");
 	SONGINFO_SetCopyright(info, "");
+	SONGINFO_SetDetail(info, "");
 }

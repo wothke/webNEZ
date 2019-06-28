@@ -859,7 +859,15 @@ static Uint32 GetWordLE(Uint8 *p)
 {
 	return p[0] | (p[1] << 8);
 }
-
+static void validateText(char *txt, int len) {
+	for (int i= 0; i<len; i++) {
+		if (!txt[i]) break;
+		if (txt[i] & 0x80) {
+			txt[0]= 0;	// non ASCII garbage
+			break;
+		}
+	}		
+}
 static Uint32 load(NEZ_PLAY *pNezPlay, GBRDMG *THIS_, Uint8 *pData, Uint32 uSize)
 {
 
@@ -914,7 +922,8 @@ static Uint32 load(NEZ_PLAY *pNezPlay, GBRDMG *THIS_, Uint8 *pData, Uint32 uSize
 			uSize = ((Uint32)THIS_->bankromnum) << 14;
 
 		XMEMSET(THIS_->titlebuffer, 0, 0x21);
-		XMEMCPY(THIS_->titlebuffer, pData + 0x0134, 0x10);
+		XMEMCPY(THIS_->titlebuffer, pData + 0x0134, 0x10);		
+		validateText(THIS_->titlebuffer, 0x10);
 		songinfodata.title=THIS_->titlebuffer;
 		SONGINFO_SetTitle(pNezPlay->song, songinfodata.title);
 
@@ -926,6 +935,19 @@ static Uint32 load(NEZ_PLAY *pNezPlay, GBRDMG *THIS_, Uint8 *pData, Uint32 uSize
 		songinfodata.copyright=THIS_->copyrightbuffer;
 		SONGINFO_SetCopyright(pNezPlay->song, songinfodata.copyright);
 		sprintf(songinfodata.detail,
+#ifdef EMSCRIPTEN
+"Type               : GBRF<br>\r\n\
+Bank ROM Num       : %XH<br>\r\n\
+Bank ROM(0000-3FFF): %XH<br>\r\n\
+Bank ROM(4000-7FFF): %XH<br>\r\n\
+Init Address       : %04XH<br>\r\n\
+VSync Address      : %04XH<br>\r\n\
+Timer Address      : %04XH<br>\r\n\
+Interrupt Flag     : %s%s<br>\r\n\
+GBC Flag(2x Speed) : %d<br>\r\n\
+First TMA          : %02XH<br>\r\n\
+First TMC          : %02XH"
+#else
 "Type               : GBRF\r\n\
 Bank ROM Num       : %XH\r\n\
 Bank ROM(0000-3FFF): %XH\r\n\
@@ -937,10 +959,13 @@ Interrupt Flag     : %s%s\r\n\
 GBC Flag(2x Speed) : %d\r\n\
 First TMA          : %02XH\r\n\
 First TMC          : %02XH"
+#endif
 			,THIS_->bankromnum,THIS_->bankromfirst[0],THIS_->bankromfirst[1],THIS_->initaddr
 			,THIS_->vsyncaddr,THIS_->timeraddr
 			,(THIS_->timerflag&1) ? "VSync " : "" , (THIS_->timerflag>>2) ? "Timer " : ""
 			,THIS_->isCGB,THIS_->firstTMA,THIS_->firstTMC);
+		
+		SONGINFO_SetDetail(pNezPlay->song, songinfodata.detail);	// EMSCRIPTEN
 		
 	}
 	else

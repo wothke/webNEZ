@@ -112,12 +112,13 @@ NEZBackendAdapter = (function(){ var $this = function () {
 					track: String, 
 					artist: String, 
 					copyright: String, 
-					tracks: String
+					tracks: String,
+					detail: String,
 					};
 		},
 		
 		updateSongInfo: function(filename, result) {
-			var numAttr= 5;
+			var numAttr= 6;
 			var ret = this.Module.ccall('emu_get_track_info', 'number');
 
 			var array = this.Module.HEAP32.subarray(ret>>2, (ret>>2)+numAttr);
@@ -127,5 +128,6 @@ NEZBackendAdapter = (function(){ var $this = function () {
 			result.artist= this.Module.Pointer_stringify(array[2]);		
 			result.copyright= this.Module.Pointer_stringify(array[3]);		
 			result.tracks= this.Module.Pointer_stringify(array[4]);
+			result.detail= this.Module.Pointer_stringify(array[5]);
 		}
 	});	return $this; })();

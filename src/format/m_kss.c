@@ -667,12 +667,21 @@ static Uint32 load(NEZ_PLAY *pNezPlay, KSSSEQ *THIS_, Uint8 *pData, Uint32 uSize
 	SONGINFO_SetExtendDevice(pNezPlay->song, THIS_->extdevice << 8);
 
 	sprintf(songinfodata.detail,
+#ifdef EMSCRIPTEN
+"Type         : KS%c%c<br>\r\n\
+Load Address : %04XH<br>\r\n\
+Load Size    : %04XH<br>\r\n\
+Init Address : %04XH<br>\r\n\
+Play Address : %04XH<br>\r\n\
+Extra Device : %s%s%s%s%s"
+#else
 "Type         : KS%c%c\r\n\
 Load Address : %04XH\r\n\
 Load Size    : %04XH\r\n\
 Init Address : %04XH\r\n\
 Play Address : %04XH\r\n\
 Extra Device : %s%s%s%s%s"
+#endif
 		,pData[0x02],pData[0x03]
 		,THIS_->dataaddr,THIS_->datasize,THIS_->initaddr,THIS_->playaddr
 		,pData[0x0F]&0x01 ? (pData[0x0F]&0x02 ? "FMUNIT " : "FMPAC ") : ""
@@ -681,6 +690,8 @@ Extra Device : %s%s%s%s%s"
 		,pData[0x0F]&0x08 ? (pData[0x0F]&0x02 ? "RAM " : "MSX-AUDIO ") : ""
 		,pData[0x0F] ? "" : "None"
 	);
+	SONGINFO_SetDetail(pNezPlay->song, songinfodata.detail);	// EMSCRIPTEN
+	
 	if (THIS_->banknum & 0x80)
 	{
 		THIS_->banknum &= 0x7f;
